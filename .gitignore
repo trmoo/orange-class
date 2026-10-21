@@ -11,3 +11,6 @@ dist/
 *.local.json
 # 편집기·미리보기 설정
 .claude/
+
+# 개발 기록은 로컬에만 둔다 — 깃허브에 올리지 않는다
+CLAUDE.md
