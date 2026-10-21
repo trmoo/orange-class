@@ -1,0 +1,21 @@
+{
+  "name": "orange-class",
+  "version": "1.0.0",
+  "description": "오렌지로 데이터 분석 — 「오렌지로 데이터 분석 UP」 실습을 오렌지 3.40 기준으로 브라우저에서 미리 해 보는 단원별 학습 앱",
+  "license": "UNLICENSED",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "vite",
+    "dev": "vite",
+    "build": "vite build && node tools/check-dist.mjs",
+    "preview": "vite preview",
+    "test": "node test/run.mjs",
+    "check:syntax": "node tools/check-syntax.mjs",
+    "codes": "node tools/make_codes.mjs"
+  },
+  "devDependencies": {
+    "vite": "^8.3.4",
+    "vite-plugin-singlefile": "^2.3.4"
+  }
+}
