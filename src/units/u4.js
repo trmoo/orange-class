@@ -74,8 +74,13 @@ export default {
       const 줄2 = ['', '전체', '남학생', '여학생', '전체'];
       const 결과 = h('div', {});
       const 줄 = 알림줄();
-      const 표 = (머리, 둘째) => h('table', { class: 'kv small' }, h('thead', {}, h('tr', {}, 머리.map((m) => h('th', {}, m || ' ')))),
-        h('tbody', {}, 둘째 ? h('tr', {}, 둘째.map((m) => h('td', { class: 'center' }, m))) : null, h('tr', {}, ['2024', '6.01', '6.14', '5.88', '7.62'].map((v) => h('td', { class: 'num' }, v)))));
+      // 스프레드시트처럼 칸마다 선을 긋고 왼쪽에 줄 번호를 단다 — 「첫 줄·둘째 줄」 이 눈에 보이게
+      const 표 = (머리, 둘째) => h('table', { class: 'kv sheet' },
+        h('thead', {}, h('tr', {}, h('th', { class: 'row-no' }, ''), ['A', 'B', 'C', 'D', 'E'].map((c) => h('th', { class: 'col-no' }, c)))),
+        h('tbody', {},
+          h('tr', {}, h('th', { class: 'row-no' }, 1), 머리.map((m) => h('td', { class: 'head-cell' }, m))),
+          둘째 ? h('tr', {}, h('th', { class: 'row-no' }, 2), 둘째.map((m) => h('td', { class: 'head-cell' }, m))) : null,
+          h('tr', {}, h('th', { class: 'row-no' }, 둘째 ? 3 : 2), ['2024', '6.01', '6.14', '5.88', '7.62'].map((v) => h('td', { class: 'num' }, v)))));
       채우기(결과, 표(줄1, 줄2));
       채우기(몸, h('div', { class: 'two' },
         h('div', {},
