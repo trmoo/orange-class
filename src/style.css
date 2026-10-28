@@ -133,6 +133,10 @@ b { font-weight: 800; }
 .qdot { width: 12px; height: 12px; border-radius: 50%; background: var(--line); }
 .qdot.on { outline: 3px solid #f5c08a; }
 .qdot.done { background: var(--green); }
+button.qdot { border: 0; padding: 0; cursor: pointer; }
+button.qdot:hover { outline: 3px solid var(--green-soft); }
+button.qdot.on:hover { outline-color: #f5c08a; }
+.quiz-end { margin-top: 8px; }
 .quiz-q { font-size: 1.12rem; margin: 6px 0 10px; }
 .choices { display: flex; flex-direction: column; gap: 8px; }
 .choices.grid2 { display: grid; grid-template-columns: 1fr 1fr; }

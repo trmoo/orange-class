@@ -36,10 +36,15 @@ export function 알림줄() {
 /**
  * 고르기 퀴즈 여러 문항 — 한 번에 한 문항씩 보여 준다(스크롤을 줄이려고).
  * 문항: [{ 질문, 보기: [...], 답: 번호, 해설, 힌트 }]
+ * 마지막 문항까지 맞히면 처음으로 되돌아가지 않고 그 자리에 「모두 맞혔어요」 를 띄운다.
+ * 다 푼 뒤에는 위쪽 점을 눌러 앞 문항의 해설을 다시 볼 수 있다.
+ * 이미 끝낸 퀴즈 카드에 다시 오면 다 푼 모습(마지막 문항)으로 그린다.
  */
 export function 퀴즈(문항들, { 열쇠, 제목 } = {}) {
-  let 지금 = 0;
-  const 맞힘 = new Array(문항들.length).fill(false);
+  const 끝 = 문항들.length - 1;
+  const 이미끝 = !!열쇠 && 끝났나(열쇠);
+  let 지금 = 이미끝 ? 끝 : 0;
+  const 맞힘 = new Array(문항들.length).fill(이미끝);
   const 상자 = h('div', { class: 'quiz' });
   function 그리기() {
     const q = 문항들[지금];
@@ -49,12 +54,9 @@ export function 퀴즈(문항들, { 열쇠, 제목 } = {}) {
       type: 'button', class: 'choice',
       onclick: (e) => {
         if (i === q.답) {
-          e.currentTarget.classList.add('ok');
-          보기묶음.querySelectorAll('.choice').forEach((c) => { c.disabled = true; });
           맞힘[지금] = true;
-          줄.맞음(q.해설 || '정답입니다!');
-          다음단추.hidden = false;
           if (맞힘.every(Boolean)) 마침(열쇠);
+          그리기();   // 맞힌 모습(정답 초록·해설·다음 단추)으로 다시 그린다
         } else {
           e.currentTarget.classList.add('bad');
           e.currentTarget.disabled = true;
@@ -64,13 +66,32 @@ export function 퀴즈(문항들, { 열쇠, 제목 } = {}) {
     }, h('span', { class: 'choice-no' }, '①②③④⑤⑥'[자리]), ' ', md(b)));
     const 짧음 = q.보기.every((b) => b.length < 16);
     const 보기묶음 = h('div', { class: 짧음 && q.보기.length % 2 === 1 ? 'choices grid3' : 짧음 ? 'choices grid2' : 'choices' }, 보기들);
-    const 다음단추 = h('button', { type: 'button', class: 'btn primary', hidden: true, onclick: () => { 지금 = (지금 + 1) % 문항들.length; 그리기(); } },
-      지금 < 문항들.length - 1 ? '다음 문제 ▶' : '처음 문제로');
+
+    // 이 문항을 이미 맞혔으면 정답을 초록으로 칠하고 보기를 잠근 채 해설을 보여 준다
+    if (맞힘[지금]) {
+      보기들.forEach((버튼, 자리) => { 버튼.disabled = true; if (차례[자리] === q.답) 버튼.classList.add('ok'); });
+      줄.맞음(q.해설 || '정답입니다!');
+    }
+    const 다끝남 = 맞힘.every(Boolean);
+    let 아래 = null;
+    if (맞힘[지금] && 지금 < 끝) {
+      아래 = h('div', { class: 'row end' }, h('button', { type: 'button', class: 'btn primary', onclick: () => { 지금 += 1; 그리기(); } }, '다음 문제 ▶'));
+    } else if (다끝남 && 문항들.length > 1) {
+      아래 = h('p', { class: 'feedback info quiz-end' }, `🎉 ${문항들.length}문제를 모두 맞혔어요! 위의 점을 누르면 앞 문제의 해설을 다시 볼 수 있어요.`);
+    }
+
+    // 다 풀었으면 점이 단추가 되어 아무 문항이나 다시 볼 수 있다
+    const 점 = (_, i) => {
+      const 이름 = `qdot${i === 지금 ? ' on' : ''}${맞힘[i] ? ' done' : ''}`;
+      return 다끝남 && 문항들.length > 1
+        ? h('button', { type: 'button', class: 이름, title: `Q${i + 1} 다시 보기`, 'aria-label': `Q${i + 1} 다시 보기`, onclick: () => { 지금 = i; 그리기(); } })
+        : h('span', { class: 이름 });
+    };
     채우기(상자,
       h('div', { class: 'quiz-head' }, 제목 ? h('b', {}, 제목) : null,
-        h('span', { class: 'quiz-dots' }, 문항들.map((_, i) => h('span', { class: `qdot${i === 지금 ? ' on' : ''}${맞힘[i] ? ' done' : ''}` })))),
+        h('span', { class: 'quiz-dots' }, 문항들.map(점))),
       h('p', { class: 'quiz-q' }, h('b', {}, `Q${지금 + 1}. `), md(q.질문)),
-      보기묶음, 줄, h('div', { class: 'row end' }, 다음단추));
+      보기묶음, 줄, 아래);
   }
   그리기();
   return 상자;
