@@ -11,6 +11,7 @@ import * as S from '../src/lib/stats.js';
 import { 준비, k평균, 실루엣 } from '../src/lib/kmeans.js';
 import { 빈발집합, 규칙들, 항목들 } from '../src/lib/assoc.js';
 import { 수면표, 비만표, 식생활표 } from '../src/data/health.js';
+import { 수면csv, 비만csv } from '../src/data/csv.js';
 import { 날씨만들기 } from '../src/data/weather.js';
 import { 설문만들기, 묶음으로, 활동, 응답수 } from '../src/data/tour.js';
 import { 합치기, 수면비만, 수면비만식생활, 수면열, 비만열, 결식열, 패스트열 } from '../src/units/health.js';
@@ -118,6 +119,30 @@ if (existsSync('입장코드.md')) {
   같다(합치기(수면표, 비만표, 2).행.length, 18);
   같다(수면비만식생활().행.length, 16);
 });
+// ── 4단원 내려받기 csv (실제 통계 수정본) ─────────────────
+시험('csv.js 가 data/ 의 파일과 같다 (npm run csv 를 다시 돌렸는가)', () => {
+  for (const 자료 of [수면csv, 비만csv]) {
+    const 원본 = readFileSync(new URL(`../data/${자료.이름}`, import.meta.url), 'utf8');
+    참(원본.startsWith('﻿'), `${자료.이름} 원본에 BOM 이 없다`);
+    같다(자료.글, 원본.replace(/^﻿/, ''), 자료.이름);
+  }
+});
+시험('csv 두 파일 — 수면 2007~2024 18줄·7열, 비만 2006~2024 19줄·10열', () => {
+  같다([수면csv.처음, 수면csv.끝, 수면csv.줄, 수면csv.열].join(), '2007,2024,18,7');
+  같다([비만csv.처음, 비만csv.끝, 비만csv.줄, 비만csv.열].join(), '2006,2024,19,10');
+});
+시험('실제 csv 를 시점으로 맞추면 18줄, 수면↔비만 r ≈ −0.92 (카드의 「앱보다 한 줄 많은 18줄」)', () => {
+  const 읽기 = (자료, 열) => { const [머리, ...행] = 자료.글.trim().split(/\r?\n/).map((r) => r.split(',')); const i = 머리.indexOf(열); return new Map(행.map((r) => [r[0], +r[i]])); };
+  const 수면 = 읽기(수면csv, '전체 주중 평균 수면시간 (시간)'), 비만 = 읽기(비만csv, '전체 비만율');
+  const 해 = [...수면.keys()].filter((k) => 비만.has(k));
+  같다(해.length, 18, 'Find matching 줄 수');
+  가깝다(S.상관(해.map((k) => 수면.get(k)), 해.map((k) => 비만.get(k))), -0.92, 0.01);
+});
+시험('4단원 「비만율 데이터도 같은 방법으로」 카드가 「머리글 두 줄을 한 줄로」 바로 뒤(5번째)에 있다', () => {
+  const 제목들 = 단원들.find((u) => u.id === 'u4').카드.map((c) => c.제목);
+  같다(제목들[3], '머리글 두 줄을 한 줄로'); 같다(제목들[4], '비만율 데이터도 같은 방법으로'); 같다(제목들[5], '오렌지에서 위젯 흐름 만들기');
+});
+
 시험('교재와 비슷한 상관계수 — 수면 −0.92 · 결식 0.90 · 패스트푸드 0.96 · 수면↔결식 −0.84', () => {
   const a = 수면비만().행, b = 수면비만식생활().행;
   const r = (행, x, y) => S.상관(행.map((v) => v[x]), 행.map((v) => v[y]));

@@ -5,12 +5,14 @@
  */
 import { h, s, 채우기, md, 수 } from '../lib/ui.js';
 import { 퀴즈, 순서, 쓰기, 자기평가, 알림줄 } from '../lib/games.js';
-import { 끝냄 } from '../lib/store.js';
+import { 끝냄, 끝났나, 글읽기, 글쓰기 } from '../lib/store.js';
 import { 상관, 상관정도, 단순회귀, 성능, 나누기 } from '../lib/stats.js';
 import { 산점도, 색들 } from '../lib/chart.js';
-import { 흐름조립, 위젯창, 묶음상자, 라디오, 열고르기, 데이터표, 위젯글 } from '../lib/orange.js';
+import { 흐름조립, 위젯창, 위젯연결도, 묶음상자, 라디오, 열고르기, 데이터표, 위젯글 } from '../lib/orange.js';
 import { 카드, 말풍선, 슬라이더, 교재메모 } from './common.js';
 import { 수면표, 비만표, 합치기, 수면비만, 수면열, 비만열 } from './health.js';
+import { 활동지내려받기 } from './project.js';
+import { 수면csv, 비만csv } from '../data/csv.js';
 
 const 마침 = (열쇠) => { 끝냄(열쇠); document.dispatchEvent(new CustomEvent('activity-done', { detail: 열쇠 })); };
 const 표값 = (표) => 표.행.map((r) => 표.열.map((k) => r[k]));
@@ -23,6 +25,31 @@ export function 훈련과시험(행, 씨앗) {
   const 모델 = 단순회귀(나눔.훈련.map((i) => x[i]), 나눔.훈련.map((i) => y[i]));
   const 점수 = 성능(나눔.시험.map((i) => y[i]), 나눔.시험.map((i) => 모델.절편 + 모델.기울기 * x[i]));
   return { 나눔, 모델, 점수, x, y };
+}
+
+// csv 를 파일로 내려받게 한다 — 앞에 BOM 을 붙여야 엑셀로 열 때 한글이 깨지지 않는다
+function csv내려받기(자료) {
+  const 주소 = URL.createObjectURL(new Blob(['﻿' + 자료.글], { type: 'text/csv;charset=utf-8' }));
+  const a = h('a', { href: 주소, download: 자료.이름 });
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(주소), 2000);
+}
+
+// 4단원 활동지 — 이 단원에서 쓴 글(합치는 기준·전문가 의견·더 넣을 속성)과 자기평가를 한 장에 담는다
+const 평가문장 = '단순 선형 회귀 분석으로 수면 시간과 비만율 사이의 선형 관계를 분석할 수 있다.';
+function 활동지4() {
+  return 활동지내려받기({
+    제목: '수면 시간과 비만율 — 4단원 활동지',
+    파일이름: '4단원_수면시간과비만율',
+    칸들: [
+      { 제목: '1. 두 데이터를 합치는 기준 속성', 물음: '비만율 데이터와 수면시간 데이터는 어떤 속성을 기준으로 하나로 통합할 수 있을까요?', 답: 글읽기('u4.merge-key') },
+      { 제목: '2. 그 속성을 기준으로 정한 이유', 답: 글읽기('u4.merge-why') },
+      { 제목: '3. 전문가 의견 — 제목과 출처', 물음: '인터넷에서 찾은 수면과 비만에 관한 전문가 의견(공공기관·병원·논문)의 제목과 출처', 답: 글읽기('u4.expert-title') },
+      { 제목: '4. 전문가 의견 — 내용 요약', 답: 글읽기('u4.expert-body') },
+      { 제목: '5. 더 넣고 싶은 속성', 물음: '수면 시간 말고 비만에 영향을 줄 속성을 하나 더 넣는다면?', 답: 글읽기('u4.more-attr') },
+      { 제목: '6. 자기평가', 물음: 평가문장, 답: 글읽기('u4.self'), 빈글: '(아직 고르지 않음)' },
+    ],
+  });
 }
 
 export default {
@@ -53,7 +80,7 @@ export default {
       채우기(몸, h('div', { class: 'two' },
         h('div', {},
           h('p', { class: 'lead' }, md('문제를 분명한 문장으로 적으면 **어떤 데이터가 필요한지** 가 보여요.')),
-          h('div', { class: 'concept' }, md('**문제** : 청소년의 평균 수면 시간과 비만율 사이에 관계가 있을까?\n**독립 변수** : 평균 수면 시간\n**종속 변수** : 비만율'))),
+          h('div', { class: 'concept' }, md('**문제** : "잠이 부족하면 살이 찌기 쉽고, 잘 자면 살이 빠진다"는 주장이 사실인지 단순 선형 회귀 분석으로 확인하려고 한다.\n**독립 변수** : 평균 수면 시간\n**종속 변수** : 비만율'))),
         퀴즈([
           { 질문: '이 프로젝트에서 **종속 변수** 는?', 보기: ['평균 수면 시간', '비만율', '연도(시점)'], 답: 1, 해설: '수면 시간의 영향을 받는(받는다고 가정한) 쪽이 비만율이에요.' },
           { 질문: '이 문제를 풀려면 어떤 데이터가 필요할까요?', 보기: ['연도별 청소년 평균 수면 시간과 연도별 비만율', '우리 반 친구들의 키와 몸무게', '서울의 연도별 기온'], 답: 0, 해설: '두 데이터를 「연도(시점)」 로 맞춰 합치면 돼요.' },
@@ -98,6 +125,29 @@ export default {
         h('p', { class: 'muted small' }, '이 앱은 두 낱말 사이에 띄어쓰기를 넣었어요. 교재 화면처럼 붙여 써도(주중평균전체) 괜찮아요.'));
     }, '교재 20쪽'),
 
+    카드('비만율 데이터도 같은 방법으로', '활동', (몸) => {
+      const 받기단추 = (자료) => h('button', { type: 'button', class: 'btn csv-btn', onclick: () => csv내려받기(자료) },
+        h('span', {}, `⬇ ${자료.이름}`), h('small', { class: 'muted' }, `${자료.처음}~${자료.끝}년 · 자료 ${자료.줄}줄 · 열 ${자료.열}개`));
+      채우기(몸, h('div', { class: 'two' },
+        h('div', {},
+          h('p', { class: 'lead' }, md(`**「청소년 비만 및 체중조절」** 데이터도 **「청소년 평균수면시간 및 주관적 건강인지율」** 데이터와 **같은 방법** 으로 내려받아 정리해요.`)),
+          h('table', { class: 'kv small' },
+            h('thead', {}, h('tr', {}, h('th', {}, ''), h('th', {}, '😴 수면 시간'), h('th', {}, '⚖️ 비만율'))),
+            h('tbody', {},
+              h('tr', {}, h('th', {}, '검색어'), h('td', {}, '수면시간'), h('td', {}, '비만')),
+              h('tr', {}, h('th', {}, '통계표'), h('td', {}, 수면csv.통계표), h('td', {}, 비만csv.통계표)),
+              h('tr', {}, h('th', {}, '[시점]'), h('td', {}, `${수면csv.처음}~${수면csv.끝}`), h('td', {}, `${비만csv.처음}~${비만csv.끝}`)),
+              h('tr', {}, h('th', {}, '받는 형식'), h('td', {}, 'csv'), h('td', {}, 'csv')),
+              h('tr', {}, h('th', {}, '정리'), h('td', {}, '머리글 두 줄 → 한 줄'), h('td', {}, '머리글 두 줄 → 한 줄')))),
+          h('div', { class: 'tip' }, md('💡 비만율 파일도 머리글이 두 줄이에요. 엑셀 **병합 단추** 는 쓰지 말고, 첫 줄과 둘째 줄을 **직접 이어 적은 뒤** 둘째 줄을 지워요.'))),
+        h('div', {},
+          h('h3', {}, '📥 정리를 마친 파일 내려받기'),
+          h('p', { class: 'small' }, '머리글을 한 줄로 정리해 둔 수정본이에요. 직접 내려받기 어렵거나 시간이 모자라면 이 두 파일로 바로 오렌지 실습을 시작해도 돼요.'),
+          h('div', { class: 'csv-btns' }, 받기단추(수면csv), 받기단추(비만csv)),
+          h('p', { class: 'muted small' }, md(`출처: 서울열린데이터광장(data.seoul.go.kr) 「${수면csv.통계표}」·「${비만csv.통계표}」. 머리글만 한 줄로 고쳤어요.`)),
+          h('div', { class: 'warn' }, md(`이 두 파일은 **실제 통계** 예요. 앱 안의 그래프·표는 연습용으로 새로 만든 값이라 숫자와 줄 수가 조금 달라요. (실제 비만율 파일은 **${비만csv.처음}년** 부터 있어서, Find matching 으로 합치면 앱의 17줄보다 한 줄 많은 **18줄** 이 돼요.)`)))));
+    }, '교재 19~20쪽'),
+
     카드('오렌지에서 위젯 흐름 만들기', '오렌지', (몸) => {
       채우기(몸,
         h('p', { class: 'small' }, md('이번 프로젝트의 **전체 위젯 흐름** 이에요. 할 일을 읽고 알맞은 위젯을 왼쪽에서 차례로 눌러 이어 보세요.')),
@@ -116,23 +166,62 @@ export default {
 
     카드('Merge Data — 두 파일 합치기', '오렌지', (몸) => {
       let 방식 = 0;
-      const 결과 = h('div', {}), 줄 = 알림줄();
+      // (1) 에서 기준 속성을 맞혀야 Row matching 이 채워지고 합친 결과가 보인다 — 오렌지도 기준을 정해야 합친다
+      let 기준 = 끝났나('u4.merge-key');
+      const 결과 = h('div', {}), 줄 = 알림줄(), 답줄 = 알림줄();
+      const 짝칸 = h('div', { class: 'row' }), 줄수 = h('span', { class: 'ow-count', title: '들어온 줄 수 (Data | Extra Data) · 나간 줄 수' });
       const 그리기 = () => {
+        const 고름 = (글) => h('select', { class: 'pick', disabled: true, 'aria-label': 'Row matching 속성' }, h('option', {}, 글));
+        채우기(짝칸, 고름(기준 ? '시점' : '?'), ' matches ', 고름(기준 ? '시점' : '?'));
+        if (!기준) {
+          채우기(줄수, `⇥ ${수면표.length} | ${비만표.length}  ↦ ?`);
+          채우기(결과, h('p', { class: 'muted small' }, '(1) 에서 두 데이터를 합칠 기준 속성을 정하면 합친 결과가 보여요.'));
+          줄.지우기();
+          return;
+        }
         const 표 = 합치기(수면표, 비만표, 방식);
         const 빈줄 = 표.행.filter((r) => 표.열.some((k) => r[k] === null)).length;
-        채우기(결과, 데이터표(표.열, 표값(표), { 최대행: 6, 설명: `${표.행.length}줄 × ${표.열.length - 1}개 속성 (+ 시점)${빈줄 ? ` · 빈칸 있는 줄 ${빈줄}개` : ''}` }));
+        채우기(줄수, `⇥ ${수면표.length} | ${비만표.length}  ↦ ${표.행.length}`);
+        채우기(결과, 데이터표(표.열, 표값(표), { 최대행: 2, 설명: `🗒️ Data Table 로 본 결과 — ${표.행.length}줄 × ${표.열.length - 1}개 속성 (+ 시점)${빈줄 ? ` · 빈칸 있는 줄 ${빈줄}개` : ''}` }));
         if (방식 === 1) { 줄.맞음('두 파일에 **모두 있는 해(2008~2024)** 만 남아 **17줄**, 빈칸이 없어요. 이 프로젝트는 이 방식을 써요.'); 마침('u4.merge'); }
-        else if (방식 === 0) 줄.틀림('Data(수면) 파일의 줄을 모두 남겨요. 비만율 자료가 없는 **2007년** 이 빈칸(?)으로 남았어요.');
-        else 줄.틀림('두 파일의 줄을 모두 남겨요. 역시 2007년에 빈칸(?)이 생겨요. 이때는 **Preprocess** 위젯의 **Impute Missing Values → Remove rows with missing values.** 로 그 줄을 지워야 해요.');
+        else if (방식 === 0) 줄.틀림('Data(수면) 파일의 줄을 모두 남겨요. 비만율이 없는 **2007년** 이 빈칸(?)으로 남았어요.');
+        else 줄.틀림('두 파일의 줄을 모두 남겨 **2007년** 이 빈칸(?)이에요. **Preprocess** 의 **Remove rows with missing values.** 로 지워야 해요.');
       };
+      const 기준칸 = h('input', { type: 'text', class: 'write key-input', placeholder: '기준이 되는 속성 이름', 'aria-label': '기준이 되는 속성 이름', value: 글읽기('u4.merge-key') });
+      기준칸.addEventListener('input', () => 글쓰기('u4.merge-key', 기준칸.value));
+      const 확인 = () => {
+        const 글 = 기준칸.value.replace(/[\s「」"'()]/g, '');
+        if (!글) { 답줄.틀림('속성 이름을 먼저 적어 보세요.'); return; }
+        if (글.includes('시점')) 답줄.맞음('맞아요! 두 파일 모두 첫 열이 **시점(연도)** 이라, 같은 해끼리 짝지어 한 줄로 합칠 수 있어요.');
+        else if (/연도|년도/.test(글)) 답줄.맞음('맞아요, 연도예요! 다만 두 파일 속 속성 이름은 **「시점」** 이에요. 오렌지에서는 그 이름을 골라요.');
+        else { 답줄.틀림('두 파일에 **똑같이 들어 있는** 속성을 찾아보세요. 수면 시간 파일과 비만율 파일의 **첫 열** 을 견주어 보면 보여요.'); return; }
+        기준 = true; 마침('u4.merge-key'); 그리기();
+      };
+      기준칸.addEventListener('keydown', (e) => { if (e.key === 'Enter') 확인(); });
       그리기();
-      채우기(몸, h('div', { class: 'two wide-right' },
+      if (기준) 답줄.맞음('기준 속성: **시점** — 같은 해끼리 짝지어 합쳐요.');
+      채우기(몸, h('div', { class: 'two' },
         h('div', {},
-          위젯창('Merge Data',
-            묶음상자('Merging', 라디오('merge', ['Append columns from Extra data', 'Find matching pairs of rows', 'Concatenate tables'], 0, (i) => { 방식 = i; 그리기(); })),
-            묶음상자('Row matching', h('div', { class: 'row' }, h('select', { class: 'pick', disabled: true }, h('option', {}, '시점')), ' matches ', h('select', { class: 'pick', disabled: true }, h('option', {}, '시점'))))),
-          h('p', { class: 'small muted' }, md('두 File 위젯을 Merge Data 에 이으면 먼저 이은 것이 **Data**, 나중 것이 **Extra Data** 가 돼요. 수면 파일은 2007년부터, 비만 파일은 2008년부터 있어요.'))),
-        h('div', {}, h('b', {}, '🗒️ Data Table 로 본 결과'), 결과, 줄)));
+          위젯연결도([
+            { id: 'f1', 위젯: 'File', 이름줄: ['파일 불러오기 (File)'], x: 85, y: 40 },
+            { id: 'f2', 위젯: 'File', 이름줄: ['파일 불러오기 (File) (1)'], x: 85, y: 138 },
+            { id: 'mg', 위젯: 'Merge Data', 이름줄: ['데이터 병합(열/조인)', '(Merge Data)'], x: 258, y: 89 },
+          ], [
+            { 부터: 'f1', 까지: 'mg', 글: '데이터 (Data)' },
+            { 부터: 'f2', 까지: 'mg', 글: '데이터 (Data) → Extra Data' },
+          ], { 너비: 336, 높이: 192, 키: 192 }),
+          h('p', { class: 'small muted fig-cap' }, '파일 불러오기 (File) 위젯 두 개를 데이터 병합(열/조인) (Merge Data) 위젯에 연결하기'),
+          h('label', { class: 'write-wrap' }, h('span', { class: 'write-label' }, md('**(1)** 비만율 데이터와 수면시간 데이터는 **어떤 속성** 을 기준으로 하나로 통합할 수 있을까요?')),
+            h('div', { class: 'row' }, 기준칸, h('button', { type: 'button', class: 'btn primary', onclick: 확인 }, '확인'))),
+          답줄,
+          쓰기('u4.merge-why', { 안내: '**(2)** 그 속성을 기준으로 정한 이유를 적어 보세요.', 줄수: 2 })),
+        h('div', {},
+          위젯창({ 이름: 'Merge Data', 제목: '데이터 병합(열/조인) (Merge Data)', 작게: true },
+            묶음상자('병합 방식', 라디오('merge', ['추가 데이터(Extra)의 열 덧붙이기 (Left Join)', '일치하는 행 쌍만 찾기 (Inner Join)', '테이블 이어붙이기 (Outer Join)'], 0, (i) => { 방식 = i; 그리기(); })),
+            묶음상자('Row matching', 짝칸),
+            h('div', { class: 'ow-foot' }, h('label', { class: 'ow-radio' }, h('input', { type: 'checkbox', checked: true, disabled: true }), ' 자동 적용 (Apply automatically)'), 줄수)),
+          h('p', { class: 'small muted fig-cap' }, md('데이터 병합(열/조인) (Merge Data) 창 — 먼저 이은 수면 파일이 **Data**, 나중 것이 **Extra Data** 예요.')),
+          결과, 줄)));
     }, '교재 21쪽'),
 
     카드('Select Columns — 쓸 속성만 고르기', '오렌지', (몸) => {
@@ -170,7 +259,7 @@ export default {
         h('div', {},
           위젯창('Scatter Plot',
             묶음상자('Axes', h('div', {}, 'Axis x: ', h('b', {}, '주중평균 전체')), h('div', {}, 'Axis y: ', h('b', {}, '비만율 전체'))),
-            묶음상자('Plot Properties', h('label', { class: 'ow-radio' }, 상자, ' Show regression line'), h('div', { class: 'small muted' }, '👆 켜면 회귀선과 상관계수 r 이 함께 보여요.'))),
+            묶음상자('Plot Properties', h('label', { class: 'ow-radio' }, 상자, ' 회귀선 표시 (Show regression line)'), h('div', { class: 'small muted' }, '👆 켜면 회귀선과 상관계수 r 이 함께 보여요.'))),
           퀴즈([
             { 질문: `r = ${수(r, 2)} 를 해석하면?`, 보기: ['수면 시간이 늘수록 비만율이 낮아지는 매우 강한 음의 상관', '수면 시간이 늘수록 비만율도 높아지는 양의 상관', '거의 상관이 없다'], 답: 0, 해설: `|r| ≥ 0.8 이고 부호가 − 라서 「${상관정도(r)}」 (음의 방향)이에요.`, 힌트: '부호는 방향, 크기는 세기예요.' },
           ], { 열쇠: 'u4.scatter-q' }))));
@@ -180,8 +269,10 @@ export default {
       const 표 = 수면비만();
       let 고정 = true, 씨앗 = 고정씨앗, 시험방식 = 0;
       const 그림 = h('div', {}), 결과 = h('div', {});
+      const 줄수 = h('span', { class: 'ow-count', title: '들어온 줄 수 · 나간 줄 수 (뽑힌 것 | 남은 것)' });
       const 그리기 = () => {
         const { 나눔, 모델, 점수 } = 훈련과시험(표.행, 씨앗);
+        채우기(줄수, `⇥ ${표.행.length}  ↦ ${나눔.훈련.length} | ${나눔.시험.length}`);
         채우기(그림, 산점도(표.행.map((row, i) => ({ x: row[수면열], y: row[비만열], 색: 나눔.시험.includes(i) ? '#e8702a' : 색들[0], 큰: 나눔.시험.includes(i) })), {
           x이름: '주중평균 전체 (시간)', y이름: '비만율 전체 (%)', 너비: 460, 높이: 290, 반지름: 6, 선: { ...모델, 글: '회귀선' } }).svg,
         h('div', { class: 'legend' }, h('span', { style: { '--c': 색들[0] } }, `훈련 ${나눔.훈련.length}개 (70%)`), h('span', { style: { '--c': '#e8702a' } }, `시험 ${나눔.시험.length}개 (30%)`)));
@@ -193,14 +284,30 @@ export default {
       const 고정상자 = h('input', { type: 'checkbox', checked: true });
       고정상자.addEventListener('change', () => { 고정 = 고정상자.checked; if (고정) { 씨앗 = 고정씨앗; 그리기(); } });
       그리기();
-      채우기(몸, h('div', { class: 'two' },
+      // 한국어판 오렌지의 데이터 샘플링 창 — 이 활동에서 쓰는 것은 「고정 비율 70 %」 와 「재현 가능한 샘플링」 뿐이라 나머지는 잠가 둔다
+      const 끔 = (글) => h('label', { class: 'ow-radio off' }, h('input', { type: 'radio', disabled: true }), ` ${글}`);
+      const 칸 = (글, 값) => h('div', { class: 'ow-sub' }, 글, h('input', { type: 'number', class: 'ow-spin', value: 값, disabled: true, 'aria-label': 글 }));
+      const 샘플링창 = 위젯창({ 이름: 'Data Sampler', 제목: '데이터 샘플링 (Data Sampler)', 작게: true },
+        묶음상자('샘플링 유형',
+          h('label', { class: 'ow-radio' }, h('input', { type: 'radio', checked: true, disabled: true }), ' 데이터의 고정 비율:'),
+          h('div', { class: 'ow-sub' }, h('input', { type: 'range', class: 'ow-slider', min: 0, max: 100, value: 70, disabled: true, 'aria-label': '고정 비율' }), h('span', {}, '70 %')),
+          끔('고정 샘플 크기'),
+          칸('인스턴스 수:', 1),
+          h('div', { class: 'ow-sub' }, h('label', { class: 'ow-radio off' }, h('input', { type: 'checkbox', disabled: true }), ' 복원 추출(중복 허용)')),
+          끔('교차 검증'),
+          칸('부분집합(폴드) 수:', 10),
+          칸('미사용 부분집합:', 1),
+          끔('부트스트랩')),
+        묶음상자('옵션',
+          h('label', { class: 'ow-radio' }, 고정상자, ' 재현 가능한(결정론적) 샘플링'),
+          h('label', { class: 'ow-radio off' }, h('input', { type: 'checkbox', disabled: true }), ' 층화 샘플링 (가능한 경우)')),
+        h('button', { type: 'button', class: 'ow-btn wide', onclick: () => { if (!고정) { 씨앗 = Math.floor(Math.random() * 1e6); 그리기(); } else 그리기(); } }, '데이터 샘플링'),
+        h('div', { class: 'ow-foot' }, 줄수));
+      채우기(몸, h('div', { class: 'ds-grid' },
         h('div', {}, 그림,
           h('p', { class: 'small muted' }, md(`나온 회귀식: 비만율 = ${수(훈련과시험(표.행, 고정씨앗).모델.기울기, 2)} × 수면 시간 + ${수(훈련과시험(표.행, 고정씨앗).모델.절편, 2)} (고정 표본일 때)`))),
+        샘플링창,
         h('div', {},
-          위젯창('Data Sampler',
-            묶음상자('Sampling Type', h('label', { class: 'ow-radio' }, h('input', { type: 'radio', checked: true, disabled: true }), ' Fixed proportion of data: ', h('b', {}, '70 %'))),
-            묶음상자('Options', h('label', { class: 'ow-radio' }, 고정상자, ' Replicable (deterministic) sampling')),
-            h('button', { type: 'button', class: 'ow-btn', onclick: () => { if (!고정) { 씨앗 = Math.floor(Math.random() * 1e6); 그리기(); } else 그리기(); } }, 'Sample Data')),
           위젯창('Test and Score',
             묶음상자('', 라디오('tas', ['Cross validation', 'Cross validation by feature', 'Random sampling', 'Leave one out', 'Test on train data', 'Test on test data'], 0, (i) => { 시험방식 = i === 5 ? 1 : 0; 그리기(); })),
             결과),
@@ -218,7 +325,7 @@ export default {
       그리기();
       채우기(몸, h('div', { class: 'two' },
         h('div', {},
-          h('p', {}, md('Replicable sampling 을 끄고 **Sample Data** 를 여러 번 누르면 훈련·시험 데이터가 매번 다르게 뽑혀요. 그때마다 R² 는 어떻게 될까요?')),
+          h('p', {}, md('데이터 샘플링 창에서 **재현 가능한(결정론적) 샘플링** 을 끄고 **데이터 샘플링** 단추를 여러 번 누르면 훈련·시험 데이터가 매번 다르게 뽑혀요. 그때마다 R² 는 어떻게 될까요?')),
           h('div', { class: 'row' }, h('button', { type: 'button', class: 'btn primary', onclick: 뽑기 }, '🎲 다시 뽑기'), h('button', { type: 'button', class: 'btn small', onclick: () => { for (let i = 0; i < 5; i++) 뽑기(); } }, '다섯 번 뽑기')),
           목록),
         h('div', {},
@@ -274,7 +381,8 @@ export default {
           쓰기('u4.expert-body', { 안내: '📝 내용 요약', 줄수: 3, 예시: '예) 잠이 부족하면 식욕을 높이는 호르몬이 늘어난다…' })),
         h('div', {},
           쓰기('u4.more-attr', { 안내: '➕ 수면 시간 말고 **비만에 영향을 줄 속성** 을 하나 더 넣는다면?', 줄수: 2, 예시: '예) 아침 식사 결식률, 패스트푸드 섭취율, 운동 시간' }),
-          자기평가('u4.self', '단순 선형 회귀 분석으로 수면 시간과 비만율 사이의 선형 관계를 분석할 수 있다.'))));
+          자기평가('u4.self', 평가문장))),
+        h('div', { class: 'row end' }, h('button', { type: 'button', class: 'btn', onclick: 활동지4 }, '💾 활동지 내려받기 (HTML)')));
     }, '교재 25쪽'),
 
   ],

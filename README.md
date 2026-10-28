@@ -40,6 +40,9 @@ npm start            # 개발 서버 (index.html)
 npm test             # 계산·데이터·입장 코드 시험
 npm run check:syntax # 소스 전수 문법·저작권 검사
 npm run build        # dist/index.html 한 파일로 빌드 + 점검
+npm run csv          # data/ 의 csv 두 개를 앱 안(src/data/csv.js)으로 옮겨 적기
 ```
 
-앱 안의 데이터는 모두 **연습용으로 새로 만든 값**입니다(실제 통계 아님). 자세한 내용은 `LICENSE`.
+앱 안에서 그래프·계산에 쓰는 데이터는 모두 **연습용으로 새로 만든 값**입니다(실제 통계 아님).
+단, 4단원에서 내려받는 csv 두 개(`data/`)는 서울열린데이터광장의 **실제 통계**를 머리글만 한 줄로 정리한 것입니다.
+자세한 내용은 `LICENSE`.

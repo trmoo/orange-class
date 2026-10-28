@@ -29,12 +29,41 @@ export function 위젯(이름, { 작게 = false, 부제 = '' } = {}) {
 /** 위젯 이름을 본문 글 속에 짧게 넣을 때 */
 export const 위젯글 = (이름) => h('span', { class: 'ow-inline' }, h('span', { class: 'ow-dot', style: { background: 갈래색[(위젯목록[이름] || ['Data'])[0]] } }), 이름);
 
-/** 위젯 설정 창 — 오렌지 창처럼 제목 막대가 있는 상자 */
+/**
+ * 위젯 설정 창 — 오렌지 창처럼 제목 막대가 있는 상자.
+ * 이름 대신 { 이름: 'Merge Data', 제목: '데이터 병합(열/조인) (Merge Data)' } 를 주면 제목 막대에 한국어판 이름을 쓴다.
+ * 작게: true 면 안쪽 여백을 줄인다(한 카드에 그림·물음·표를 함께 둘 때).
+ */
 export function 위젯창(이름, ...내용) {
-  const [갈래, 그림] = 위젯목록[이름] || ['Data', '❔'];
-  return h('div', { class: 'ow-window' },
-    h('div', { class: 'ow-title' }, h('span', { class: 'ow-icon tiny', style: { background: 갈래색[갈래] } }, 그림), ` ${이름}`, h('span', { class: 'ow-ver' }, 'Orange 3.40')),
+  const { 이름: 위젯이름, 제목, 작게 } = typeof 이름 === 'string' ? { 이름, 제목: 이름 } : 이름;
+  const [갈래, 그림] = 위젯목록[위젯이름] || ['Data', '❔'];
+  return h('div', { class: `ow-window${작게 ? ' compact' : ''}` },
+    h('div', { class: 'ow-title' }, h('span', { class: 'ow-icon tiny', style: { background: 갈래색[갈래] } }, 그림), ` ${제목}`, h('span', { class: 'ow-ver' }, 'Orange 3.40')),
     h('div', { class: 'ow-body' }, 내용));
+}
+
+/**
+ * 위젯 연결도 — 이미 이어 둔 위젯 흐름을 그림으로만 보여 준다(조립 활동 없이).
+ * 위젯들: [{ id, 위젯, 이름줄: ['파일 불러오기 (File)'], x, y }]
+ * 선들: [{ 부터: id, 까지: id, 글: '데이터 (Data)' }]
+ */
+export function 위젯연결도(위젯들, 선들, { 너비 = 330, 높이 = 230, 키 = 190 } = {}) {
+  const 자리 = new Map(위젯들.map((d) => [d.id, d]));
+  const 그림판 = s('svg', { viewBox: `0 0 ${너비} ${높이}`, class: 'ow-canvas', style: `height:${키}px` });
+  for (const { 부터, 까지, 글 } of 선들) {
+    const a = 자리.get(부터), b = 자리.get(까지);
+    const 가운데 = (a.x + b.x) / 2;
+    그림판.append(s('path', { d: `M${a.x + 30},${a.y} C${가운데},${a.y} ${가운데},${b.y} ${b.x - 30},${b.y}`, class: 'ow-link' }));
+    if (글) 그림판.append(s('text', { x: 가운데, y: (a.y + b.y) / 2 - 8, class: 'ow-link-label', 'text-anchor': 'middle' }, 글));
+  }
+  for (const d of 위젯들) {
+    const [갈래, 그림] = 위젯목록[d.위젯] || ['Data', '❔'];
+    그림판.append(s('g', { class: 'ow-node' },
+      s('circle', { cx: d.x, cy: d.y, r: 28, fill: 갈래색[갈래], stroke: '#888', 'stroke-width': 1.5 }),
+      s('text', { x: d.x, y: d.y + 8, 'text-anchor': 'middle', class: 'ow-node-icon' }, 그림),
+      (d.이름줄 || [d.위젯]).map((줄, i) => s('text', { x: d.x, y: d.y + 46 + i * 15, 'text-anchor': 'middle', class: 'ow-node-name' }, 줄))));
+  }
+  return 그림판;
 }
 
 /** 설정 창 속 묶음 상자 (오렌지의 회색 테두리 상자) */
@@ -109,29 +138,106 @@ export function 흐름조립(단계들, { 열쇠, 팔레트, 높이 = 300, 너�
 }
 
 /**
- * Select Columns 연습 — 속성을 눌러 고른 뒤 네 상자 중 하나를 누른다.
+ * Select Columns 연습 — 속성을 골라 네 상자 중 하나로 옮긴다.
+ *  · 누르면 하나를 고르고, 누른 채 끌면 같은 상자 안에서 여러 개를 한꺼번에 고른다(오렌지의 목록과 같다).
+ *  · Ctrl 을 누른 채 누르면 하나씩 더하거나 빼고, Shift 를 누른 채 누르면 그 사이를 모두 고른다.
+ *  · 고른 속성은 옮길 상자를 누르거나, 고른 것을 끌어다 상자에 놓으면 옮겨진다.
+ *  마우스와 전자칠판(터치)이 같은 포인터 이벤트로 돈다.
  * 답: { 속성이름: 'Features' | 'Target' | 'Metas' | 'Ignored' }  (답에 없는 속성은 Ignored)
  */
 export function 열고르기(속성들, 답, { 열쇠, 처음 = {} } = {}) {
   const 상자이름 = ['Ignored', 'Features', 'Target', 'Metas'];
   const 설명 = { Ignored: '쓰지 않음', Features: '독립 변수', Target: '종속 변수', Metas: '설명용 (계산에 안 씀)' };
   const 자리 = Object.fromEntries(속성들.map((a) => [a, 처음[a] || 'Ignored']));
-  let 고른 = null;
+  const 고른 = new Set();
+  let 기준 = null;    // Shift 로 범위를 잡을 때 시작하는 속성
+  let 끌기 = null;    // 누르고 있는 동안: { 모드: '고르기' | '옮기기', 시작, x, y, 움직임 }
+  let 방금끎 = false; // 끌기가 막 끝났을 때 뒤따르는 click 으로 엉뚱하게 옮기지 않게
+  const 칩 = new Map(), 상자칸 = new Map();
   const 줄 = 알림줄();
-  const 몸 = h('div', { class: 'selcols' });
+  // 움직임·뗌은 몸 전체에서 받는다 — 붙잡은 단추에서 올라오는 것도, 다른 상자 위의 것도 모두 여기로 온다
+  const 몸 = h('div', { class: 'selcols', onpointermove: (e) => 움직일때(e), onpointerup: (e) => 뗐을때(e), onpointercancel: () => { 끌기 = null; 놓을곳지우기(); } });
+  const 같은상자 = (b) => 속성들.filter((a) => 자리[a] === b);
+  // 같은 상자 안에서 a 부터 z 까지(화면 차례대로) 이어진 속성들
+  const 범위 = (a, z) => {
+    const 목록 = 같은상자(자리[a]);
+    const [i, j] = [목록.indexOf(a), 목록.indexOf(z)].sort((p, q) => p - q);
+    return 목록.slice(i, j + 1);
+  };
+  const 아래 = (e, 고를것) => document.elementFromPoint(e.clientX, e.clientY)?.closest?.(고를것);
+  // 다시 그리지 않고 색만 바꾼다 — 끄는 도중에 단추가 바뀌면 포인터를 놓친다
+  const 표시 = () => {
+    for (const [a, el] of 칩) el.classList.toggle('picked', 고른.has(a));
+    for (const el of 상자칸.values()) el.classList.toggle('ready', 고른.size > 0);
+  };
+  const 놓을곳지우기 = () => { for (const el of 상자칸.values()) el.classList.remove('drop'); };
+  const 옮기기 = (b) => { for (const a of 고른) 자리[a] = b; 고른.clear(); 기준 = null; 그리기(); 줄.지우기(); };
+
+  function 눌렀을때(e, a) {
+    if (e.button > 0) return;
+    e.preventDefault(); // 끄는 동안 글자가 칠해지지 않게
+    if (e.ctrlKey || e.metaKey) { if (고른.has(a)) 고른.delete(a); else 고른.add(a); 기준 = a; 표시(); return; }
+    if (e.shiftKey && 기준 && 자리[기준] === 자리[a]) { 고른.clear(); for (const k of 범위(기준, a)) 고른.add(k); 표시(); return; }
+    const 모드 = 고른.has(a) ? '옮기기' : '고르기';
+    if (모드 === '고르기') { 고른.clear(); 고른.add(a); 기준 = a; 표시(); }
+    끌기 = { 모드, 시작: a, x: e.clientX, y: e.clientY, 움직임: false };
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* 붙잡지 못해도 몸에서 이벤트를 받는다 */ }
+  }
+  function 움직일때(e) {
+    if (!끌기) return;
+    if (!끌기.움직임 && Math.hypot(e.clientX - 끌기.x, e.clientY - 끌기.y) < 5) return;
+    끌기.움직임 = true;
+    if (끌기.모드 === '고르기') {
+      const z = 아래(e, '.attr')?.dataset.attr;
+      if (z && 자리[z] === 자리[끌기.시작]) { 고른.clear(); for (const k of 범위(끌기.시작, z)) 고른.add(k); 표시(); }
+    } else {
+      const 상 = 아래(e, '.selcol-box');
+      for (const el of 상자칸.values()) el.classList.toggle('drop', el === 상);
+    }
+  }
+  function 뗐을때(e) {
+    if (!끌기) return;
+    const { 모드, 움직임, 시작: a } = 끌기;
+    끌기 = null;
+    놓을곳지우기();
+    if (움직임) { 방금끎 = true; setTimeout(() => { 방금끎 = false; }, 0); }
+    if (모드 !== '옮기기') return;
+    if (움직임) {
+      const b = 아래(e, '.selcol-box')?.dataset.box;
+      if (b) 옮기기(b);
+      return;
+    }
+    // 이미 고른 것을 그냥 누르면: 하나만 골라 있었으면 풀고, 여럿이면 그것 하나만 남긴다
+    if (고른.size === 1) { 고른.clear(); 기준 = null; } else { 고른.clear(); 고른.add(a); 기준 = a; }
+    표시();
+  }
+
   function 그리기() {
-    채우기(몸, 상자이름.map((b) => h('div', {
-      class: `selcol-box${고른 ? ' ready' : ''}`, role: 'button', tabindex: 0,
-      onclick: () => { if (고른) { 자리[고른] = b; 고른 = null; 그리기(); } },
-    }, h('div', { class: 'selcol-title' }, b, h('small', {}, ` ${설명[b]}`)),
-    h('div', { class: 'selcol-list' }, 속성들.filter((a) => 자리[a] === b).map((a) => h('button', {
-      type: 'button', class: `attr${고른 === a ? ' picked' : ''}`,
-      onclick: (e) => { e.stopPropagation(); 고른 = 고른 === a ? null : a; 그리기(); },
-    }, a))))));
+    칩.clear(); 상자칸.clear();
+    채우기(몸, 상자이름.map((b) => {
+      const 칸 = h('div', {
+        class: 'selcol-box', role: 'button', tabindex: 0, 'data-box': b, 'aria-label': `${b} 상자로 옮기기`,
+        onclick: () => { if (!방금끎 && 고른.size) 옮기기(b); },
+        onkeydown: (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget && 고른.size) { e.preventDefault(); 옮기기(b); } },
+      }, h('div', { class: 'selcol-title' }, b, h('small', {}, ` ${설명[b]}`)),
+      h('div', { class: 'selcol-list' }, 같은상자(b).map((a) => {
+        const el = h('button', {
+          type: 'button', class: 'attr', 'data-attr': a,
+          onpointerdown: (e) => 눌렀을때(e, a),
+          // 키보드(Enter·Space)로 누르면 하나씩 고르고 푼다. 마우스 click 은 상자까지 올라가지 않게 막는다
+          onclick: (e) => { e.stopPropagation(); if (e.detail === 0) { if (고른.has(a)) 고른.delete(a); else 고른.add(a); 표시(); } },
+        }, a);
+        칩.set(a, el);
+        return el;
+      })));
+      상자칸.set(b, 칸);
+      return 칸;
+    }));
+    표시();
   }
   그리기();
   return h('div', {},
-    위젯창('Select Columns', h('p', { class: 'muted small' }, '속성을 누른 뒤 옮길 상자를 누르세요.'), 몸,
+    위젯창('Select Columns', h('p', { class: 'muted small' }, '속성을 누른 채 끌면 여러 개를 한꺼번에 골라요. 고른 속성을 상자로 끌어 놓거나, 옮길 상자를 누르세요.'), 몸,
       h('div', { class: 'row end' }, h('button', {
         type: 'button', class: 'btn primary',
         onclick: () => {
