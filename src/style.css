@@ -336,3 +336,19 @@ code { background: #f3eee8; border-radius: 5px; padding: 1px 6px; font-family: C
 .csv-btns { display: flex; flex-direction: column; gap: 10px; margin: 8px 0; }
 .csv-btn { flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
 .kv.sheet .head-cell { font-weight: 800; background: #fff8ee; min-width: 5.5em; }
+/* 4단원 12번 홀드아웃 · 13번 교차 검증 */
+.yr-strip { display: flex; flex-wrap: wrap; gap: 3px; margin: 4px 0; }
+.yr { color: #fff; font-size: .74rem; font-weight: 700; padding: 1px 5px; border-radius: 5px; font-variant-numeric: tabular-nums; }
+.r2-dots-box { min-height: 120px; display: flex; align-items: center; justify-content: center; }
+.r2-dots { width: 100%; height: auto; margin: 4px 0; }
+.r2-tick { font-size: 12px; fill: #666; }
+.r2-mark { font-size: 12px; font-weight: 700; }
+.cv-grid { width: 100%; height: auto; margin: 4px 0 6px; }
+.cv-year { font-size: 10px; fill: #666; }
+.cv-round { fill: #444; font-weight: 700; }
+.cv-note { min-height: 2.6em; margin: 6px 0 0; }
+.cv-result { margin: 6px 0; }
+.cv-result .big-num { font-size: 1.6rem; }
+.cv-cmp { width: 100%; font-size: .88rem; margin: 4px 0; }
+.cv-map { margin: 0; padding-left: 1.2em; }
+.cv-map li { margin: 4px 0; }

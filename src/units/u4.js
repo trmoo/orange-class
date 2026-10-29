@@ -3,10 +3,10 @@
  *  성취기준 [12데과03-02] · 학습 요소: 선형 회귀 · 교과서 108~131쪽
  *  데이터는 연습용으로 새로 만든 값이다(src/data/health.js).
  */
-import { h, s, 채우기, md, 수 } from '../lib/ui.js';
+import { h, s, 채우기, md, 수, 창 } from '../lib/ui.js';
 import { 퀴즈, 순서, 쓰기, 자기평가, 알림줄 } from '../lib/games.js';
 import { 끝냄, 끝났나, 글읽기, 글쓰기 } from '../lib/store.js';
-import { 상관, 상관정도, 단순회귀, 성능, 나누기 } from '../lib/stats.js';
+import { 상관, 상관정도, 단순회귀, 성능, 나누기, 난수 } from '../lib/stats.js';
 import { 산점도, 색들 } from '../lib/chart.js';
 import { 흐름조립, 위젯창, 위젯연결도, 묶음상자, 라디오, 열고르기, 데이터표, 위젯글 } from '../lib/orange.js';
 import { 카드, 말풍선, 슬라이더, 교재메모 } from './common.js';
@@ -25,6 +25,70 @@ export function 훈련과시험(행, 씨앗) {
   const 모델 = 단순회귀(나눔.훈련.map((i) => x[i]), 나눔.훈련.map((i) => y[i]));
   const 점수 = 성능(나눔.시험.map((i) => y[i]), 나눔.시험.map((i) => 모델.절편 + 모델.기울기 * x[i]));
   return { 나눔, 모델, 점수, x, y };
+}
+
+/** 홀드아웃을 여러 번 — 씨앗 하나 = 한 번 나눈 것. 시험 데이터로 낸 R² 들을 돌려준다 */
+export const 홀드아웃여러번 = (행, 씨앗들) => 씨앗들.map((s) => 훈련과시험(행, s).점수.R2);
+
+/**
+ * k-겹 교차 검증 — 섞은 차례대로 k 묶음(폴드)에 돌려 담고, 한 묶음씩 시험으로 쓴다(나머지로 학습).
+ * 판마다 나온 예측을 모두 모아 한꺼번에 점수를 낸다 — 오렌지 Test and Score 도 이렇게 낸다.
+ * k 가 데이터 수와 같으면 LOOCV(하나 빼고 검증)이고, 그때는 섞는 차례와 상관없이 늘 같은 값이 나온다.
+ */
+export function 교차검증(행, k, 씨앗 = 1) {
+  const x = 행.map((r) => r[수면열]), y = 행.map((r) => r[비만열]);
+  const n = 행.length, rnd = 난수(씨앗);
+  const 섞음 = [...Array(n).keys()];
+  for (let i = n - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [섞음[i], 섞음[j]] = [섞음[j], 섞음[i]]; }
+  const 묶음 = new Array(n);
+  섞음.forEach((v, i) => { 묶음[v] = i % k; });
+  const 예측 = new Array(n);
+  const 판들 = [];
+  for (let f = 0; f < k; f++) {
+    const 학습 = [], 시험 = [];
+    for (let i = 0; i < n; i++) (묶음[i] === f ? 시험 : 학습).push(i);
+    const 모델 = 단순회귀(학습.map((i) => x[i]), 학습.map((i) => y[i]));
+    for (const i of 시험) 예측[i] = 모델.절편 + 모델.기울기 * x[i];
+    판들.push({ 학습, 시험, 모델 });
+  }
+  return { 묶음, 판들, 예측, 점수: 성능(y, 예측) };
+}
+
+const 학습색 = 색들[0], 시험색 = '#e8702a';
+
+// R² 점 그림 — 점 하나가 한 번 나눈 것. 0.05 칸마다 쌓고, 0 보다 작은 것은 왼쪽 「0 미만」 칸에 모은다
+function 점분포(값들, 표시 = []) {
+  const 칸 = (v) => (v < 0 ? -1 : Math.min(19, Math.floor(v / 0.05)));
+  const 개수 = new Map();
+  const 점 = 값들.map((v) => { const c = 칸(v); const k = 개수.get(c) || 0; 개수.set(c, k + 1); return [c, k]; });
+  const 왼 = 76, 오 = 540, 바닥 = 34 + Math.max(8, ...개수.values()) * 8;
+  const 칸X = (c) => (c < 0 ? 34 : 왼 + (c + 0.5) * ((오 - 왼) / 20));
+  const 값X = (v) => 왼 + Math.max(0, Math.min(1, v)) * (오 - 왼);
+  return s('svg', { viewBox: `0 0 560 ${바닥 + 22}`, class: 'r2-dots', role: 'img', 'aria-label': `홀드아웃 ${값들.length}번의 R² 분포` },
+    s('line', { x1: 14, x2: 오, y1: 바닥, y2: 바닥, stroke: '#999' }),
+    s('line', { x1: 왼 - 12, x2: 왼 - 12, y1: 18, y2: 바닥, stroke: '#ccc', 'stroke-dasharray': '3 3' }),
+    [0, 0.5, 1].map((v) => s('text', { x: 값X(v), y: 바닥 + 16, 'text-anchor': 'middle', class: 'r2-tick' }, String(v))),
+    s('text', { x: 34, y: 바닥 + 16, 'text-anchor': 'middle', class: 'r2-tick' }, '0 미만'),
+    점.map(([c, k]) => s('circle', { cx: 칸X(c), cy: 바닥 - 5 - k * 8, r: 3.4, fill: c < 0 ? '#d6454b' : 학습색 })),
+    표시.map((m) => [
+      s('line', { x1: 값X(m.값), x2: 값X(m.값), y1: 14, y2: 바닥, stroke: m.색, 'stroke-width': 2, 'stroke-dasharray': '5 3' }),
+      s('text', { x: 값X(m.값) + (m.쪽 === 'end' ? -4 : 4), y: 12, 'text-anchor': m.쪽 || 'start', class: 'r2-mark', fill: m.색 }, m.글)]));
+}
+
+// 교차 검증 격자 — 한 줄이 한 판, 한 칸이 한 해. 주황이 그 판의 시험 데이터. 아직 안 한 판은 흐리게 그린다
+function 교차격자(cv, 끝낸, 해들) {
+  const k = cv.판들.length, n = 해들.length;
+  const 왼 = 46, 칸w = (560 - 왼 - 2) / n, 칸h = Math.min(24, 210 / k), 위 = 18;
+  const 글크기 = Math.min(12, 칸h - 1);
+  return s('svg', { viewBox: `0 0 560 ${위 + k * 칸h + 2}`, class: 'cv-grid', role: 'img', 'aria-label': `${k}겹 교차 검증 — ${끝낸}판까지 함` },
+    해들.map((t, i) => s('text', { x: 왼 + (i + 0.5) * 칸w, y: 12, 'text-anchor': 'middle', class: 'cv-year' }, t)),
+    cv.판들.map((판, f) => {
+      const y = 위 + f * 칸h, 됨 = f < 끝낸;
+      return s('g', { opacity: 됨 ? 1 : 0.2 },
+        s('text', { x: 왼 - 6, y: y + 칸h / 2 + 글크기 * 0.35, 'text-anchor': 'end', class: 'cv-round', 'font-size': 글크기 }, `${f + 1}판`),
+        해들.map((_, i) => s('rect', { x: 왼 + i * 칸w + 1, y: y + 1, width: 칸w - 2, height: 칸h - 2, rx: 3, fill: 판.시험.includes(i) ? 시험색 : 학습색,
+          stroke: f === 끝낸 - 1 ? '#222' : 'none', 'stroke-width': 1.5 })));
+    }));
 }
 
 // csv 를 파일로 내려받게 한다 — 앞에 BOM 을 붙여야 엑셀로 열 때 한글이 깨지지 않는다
@@ -353,6 +417,118 @@ export default {
           h('div', { class: 'concept' }, md('데이터가 **17개뿐** 이라 시험 데이터는 5개예요. 어떤 5개가 뽑히느냐에 따라 R² 가 크게 달라져요.')),
           교재메모('교재는 결정계수 **0.89** 를 얻었다고 해요. 교재도 「연결선에 따라 결정계수 값이 다르게 나올 수 있다」고 적어 두었어요. 내 결과가 교재와 다르다고 틀린 것이 아니에요.'),
           퀴즈([{ 질문: '결과를 믿을 만하게 하려면?', 보기: ['R² 가 가장 높게 나온 한 번만 발표한다', '여러 번 해 보거나 데이터를 더 모은다'], 답: 1, 해설: '좋은 결과만 골라 보이는 것은 데이터를 속이는 일이에요.' }], { 열쇠: 'u4.resample-q' }))));
+    }, '교재 23쪽'),
+
+    카드('홀드아웃 — 시험 문제를 따로 떼어 두기', '개념', (몸) => {
+      const 표 = 수면비만();
+      const { 나눔, 점수 } = 훈련과시험(표.행, 고정씨앗);
+      const 띠 = h('div', { class: 'yr-strip' }, 표.행.map((r, i) => h('span', { class: 'yr', style: { background: 나눔.시험.includes(i) ? 시험색 : 학습색 } }, String(r.시점))));
+      const 그림 = h('div', { class: 'r2-dots-box' }, h('p', { class: 'muted center' }, '단추를 누르면 점이 찍혀요. 점 하나가 「한 번 나눈 것」 이에요.'));
+      const 요약 = h('p', { class: 'small' });
+      let 몇번 = 0;
+      const 나눠보기 = () => {
+        // 처음 100번은 늘 씨앗 1~100 — 다음 카드(교차 검증)가 이 100번과 견준다
+        const 시작 = 몇번 === 0 ? 1 : 1000 + Math.floor(Math.random() * 1e6);
+        const 값들 = 홀드아웃여러번(표.행, Array.from({ length: 100 }, (_, i) => 시작 + i));
+        몇번++;
+        const 줄 = [...값들].sort((a, b) => a - b), 가운데 = (줄[49] + 줄[50]) / 2, 음수 = 줄.filter((v) => v < 0).length;
+        채우기(그림, 점분포(값들, [{ 값: 가운데, 글: `가운데 ${수(가운데, 2)}`, 색: '#555', 쪽: 'end' }, { 값: 점수.R2, 글: `단계 5 (${수(점수.R2, 2)})`, 색: 시험색 }]));
+        채우기(요약, md(`100번 나눠 본 R² — 가장 낮음 **${수(줄[0], 2)}** · 가운데 **${수(가운데, 2)}** · 가장 높음 **${수(줄[99], 2)}**. 0.5 아래로 떨어진 것이 **${줄.filter((v) => v < 0.5).length}번**이에요.`
+          + (음수 ? ` 빨간 점(${음수}번)은 R² 가 0 보다 작은 것 — 시험 데이터를 평균 하나로 찍는 것보다도 못 맞혔다는 뜻이에요.` : '')));
+        마침('u4.holdout');
+      };
+      채우기(몸, h('div', { class: 'two' },
+        h('div', {},
+          h('div', { class: 'concept' }, md('**홀드아웃(hold-out)** 은 데이터 일부를 처음부터 **떼어 두고(hold out)** 학습에는 쓰지 않았다가, 모델을 다 만든 뒤 그 떼어 둔 데이터로 시험을 보는 평가 방법이에요.')),
+          h('p', {}, md('**10번 카드(단계 5)** 에서 한 것이 바로 홀드아웃이에요. Data Sampler 가 떼어 둔 30 % 로 **「별도 테스트 데이터로 평가」** 를 했지요.')),
+          띠,
+          h('div', { class: 'legend' }, h('span', { style: { '--c': 학습색 } }, `학습 ${나눔.훈련.length}개 (70 %)`), h('span', { style: { '--c': 시험색 } }, `시험 ${나눔.시험.length}개 (30 %, 떼어 둔 것)`)),
+          h('div', { class: 'tip' }, md('🧸 **쉽게 말하면** — 문제집으로 공부하고, 선생님이 숨겨 둔 문제로 시험 보기. 문제집 문제를 그대로 내면 아는 것인지 외운 것인지 알 수 없으니까요.')),
+          퀴즈([{ 질문: '10번 카드의 「모델 검증 및 평가」 창에서 홀드아웃은 어느 것이었나요?', 보기: ['교차 검증', '학습 데이터로 직접 평가', '별도 테스트 데이터로 평가'], 답: 2,
+            해설: '학습에 쓰지 않고 떼어 둔 데이터(Test Data)로 평가하는 것이 홀드아웃이에요. 「학습 데이터로 직접 평가」 는 배운 문제로 다시 시험을 보는 것이에요.' }], { 열쇠: 'u4.holdout-q' })),
+        h('div', {},
+          h('p', {}, md('그런데 **딱 한 번** 나누면, 어떤 5개가 시험으로 뽑히느냐에 따라 점수가 달라져요(11번 카드). 100번 나눠 보면 얼마나 흔들릴까요?')),
+          h('button', { type: 'button', class: 'btn primary', onclick: 나눠보기 }, '🎲 100번 나눠 보기'),
+          그림, 요약,
+          h('div', { class: 'concept' }, md('데이터가 적으면 홀드아웃 점수 **하나만으로는** 모델을 믿기 어려워요. 시험을 한 번만 보지 말고 **돌아가며 여러 번** 보면 어떨까요? → 다음 카드 **교차 검증**')))));
+    }, '교재 23쪽'),
+
+    카드('교차 검증 — 돌아가며 시험 보기', '활동', (몸) => {
+      const 표 = 수면비만();
+      const n = 표.행.length;
+      const 해 = 표.행.map((r) => `'${String(r.시점).slice(-2)}`);
+      const 홀드 = 홀드아웃여러번(표.행, Array.from({ length: 100 }, (_, i) => i + 1)).sort((a, b) => a - b);
+      let k = 5, 씨앗 = 1, 끝낸 = 0, 기록됨 = false;
+      let cv = 교차검증(표.행, k, 씨앗);
+      const 기록 = [];   // 지금 폴드 수로 끝까지 돌려 본 R² — 다시 섞을 때마다 하나씩 는다
+      const 격자 = h('div', {}), 알림 = h('p', { class: 'small cv-note' }), 결과 = h('div', { class: 'cv-result' });
+      const 이름 = () => (k === n ? 'LOOCV' : `${k}겹 교차 검증`);
+      function 그리기() {
+        채우기(격자, 교차격자(cv, 끝낸, 해));
+        const 판 = cv.판들[끝낸 - 1];
+        채우기(알림, 끝낸 === 0 ? md('**▶ 한 판씩** 을 눌러 보세요. 한 줄이 한 판이고, **주황 칸** 이 그 판의 시험 데이터예요.')
+          : 끝낸 < k ? md(`**${끝낸}판** — 시험: ${판.시험.map((i) => 해[i]).join(' · ')} (${판.시험.length}개) · 학습: 나머지 ${판.학습.length}개`)
+            : md(`**${k}판 모두 끝!** 모델을 ${k}번 만들었고, ${n}개 데이터가 **꼭 한 번씩** 시험을 봤어요.`));
+        const 센 = cv.판들.slice(0, 끝낸).reduce((a, p) => a + p.시험.length, 0);
+        채우기(결과,
+          끝낸 < k ? h('p', { class: 'muted' }, `${끝낸} / ${k}판 · 예측한 데이터 ${센} / ${n}개`)
+            : [h('div', { class: 'big-num' }, `R² ${수(cv.점수.R2, 2)}`), h('p', { class: 'small' }, md(`판마다 나온 예측 ${n}개를 **모두 모아** 한 번에 낸 점수예요. 오렌지 Test and Score 도 이렇게 셈해요.`))],
+          h('table', { class: 'kv cv-cmp' }, h('tbody', {},
+            h('tr', {}, h('td', {}, '홀드아웃 100번 (12번 카드)'), h('td', { class: 'num' }, `${수(홀드[0], 2)} ~ ${수(홀드[99], 2)}`)),
+            h('tr', { class: 'hl' }, h('td', {}, `${이름()} · 섞어서 ${기록.length}번`),
+              h('td', { class: 'num' }, 기록.length ? `${수(Math.min(...기록), 2)} ~ ${수(Math.max(...기록), 2)}` : '끝까지 돌려 보세요')))),
+          기록.length >= 2 ? h('p', { class: 'small' }, md(k === n ? '**LOOCV 는 몇 번을 섞어도 같은 값** 이에요. 하나씩 빼고 모두 해 보니 나누는 데 운이 끼어들 자리가 없어요.'
+            : '여러 번 섞어도 **홀드아웃보다 훨씬 덜 흔들려요.** 모든 데이터가 한 번씩 시험을 보니 「운 좋은 5개」·「운 나쁜 5개」 가 섞여 고르게 되거든요.')) : null);
+      }
+      const 다시 = (새k, 새씨앗) => { k = 새k; 씨앗 = 새씨앗; cv = 교차검증(표.행, k, 씨앗); 끝낸 = 0; 기록됨 = false; 그리기(); };
+      const 다함 = () => { if (!기록됨) { 기록.push(cv.점수.R2); 기록됨 = true; 마침('u4.cv'); } };
+      const 한판 = () => { if (끝낸 < k) { 끝낸++; if (끝낸 === k) 다함(); 그리기(); } };
+      const 끝까지 = () => { 끝낸 = k; 다함(); 그리기(); };
+      // 10번 카드의 「모델 검증 및 평가」 창에서 교차 검증과 LOOCV 만 꺼내 왔다 — 폴드 수는 오렌지처럼 2·3·5·10·20
+      const 경고 = h('div', {});
+      const 폴드 = h('select', { class: 'ow-combo', 'aria-label': '폴드 수' }, [2, 3, 5, 10, 20].map((v) => h('option', { value: v, selected: v === 5 }, String(v))));
+      const 교차단추 = h('input', { type: 'radio', name: 'cvm', checked: true });
+      const 하나단추 = h('input', { type: 'radio', name: 'cvm' });
+      const 폴드로 = () => {
+        const v = Number(폴드.value);
+        채우기(경고, v > n ? h('p', { class: 'feedback bad' }, `데이터가 ${n}개뿐이라 ${v}묶음으로는 나눌 수 없어요. 오렌지도 이때는 오류를 알려요.`) : null);
+        if (v <= n) { 기록.length = 0; 다시(v, 1); }
+        else 폴드.value = String(k < n ? k : 5);   // 나눌 수 없는 값은 받지 않고, 지금 돌고 있는 폴드 수로 되돌린다
+      };
+      교차단추.addEventListener('change', 폴드로);
+      폴드.addEventListener('change', () => { 교차단추.checked = true; 폴드로(); });
+      하나단추.addEventListener('change', () => { 채우기(경고); 기록.length = 0; 다시(n, 1); });
+      const 평가창 = 위젯창({ 이름: 'Test and Score', 제목: '모델 검증 및 평가 (Test and Score)', 작게: true },
+        h('div', { class: 'ow-radios' },
+          h('label', { class: 'ow-radio' }, 교차단추, ' 교차 검증 (Cross validation)'),
+          h('div', { class: 'ow-sub' }, '폴드 수: (Number of folds:)', 폴드),
+          h('label', { class: 'ow-radio' }, 하나단추, ' LOOCV (하나 빼고 검증) (Leave one out)')));
+      그리기();
+      채우기(몸, h('div', { class: 'two wide-left' },
+        h('div', {},
+          h('div', { class: 'concept' }, md('**k-겹 교차 검증(k-fold cross validation)** — 데이터를 **k 묶음(폴드)** 으로 나누고, 한 묶음씩 **돌아가며** 시험으로 써요. 나머지 묶음으로 학습하니 모델을 k 번 만들고, 모든 데이터가 꼭 한 번씩 시험을 봐요.')),
+          격자,
+          h('div', { class: 'row' },
+            h('button', { type: 'button', class: 'btn primary', onclick: 한판 }, '▶ 한 판씩'),
+            h('button', { type: 'button', class: 'btn', onclick: 끝까지 }, '⏩ 끝까지'),
+            h('button', { type: 'button', class: 'btn small', onclick: () => 다시(k, 2 + Math.floor(Math.random() * 1e6)) }, '🔀 다시 섞기')),
+          알림),
+        h('div', {},
+          h('p', { class: 'small' }, md('**10번 카드** 의 「모델 검증 및 평가」 창 맨 위에 있던 **교차 검증** 이 바로 이것이에요. 폴드 수를 바꿔 보세요.')),
+          평가창, 경고, 결과,
+          h('div', { class: 'row' },
+            h('button', { type: 'button', class: 'btn small', onclick: 여섯가지 }, '📋 창의 평가 방법 여섯 가지'),
+            h('a', { class: 'btn small', href: '#u4/9' }, '↩ 10번 카드 창 다시 보기')))));
+      // 여섯 가지 풀이는 카드에 펼치면 1280×720 을 넘쳐서 창으로 띄운다
+      function 여섯가지() {
+        창('📋 「모델 검증 및 평가」 창의 평가 방법 여섯 가지', h('ul', { class: 'cv-map' },
+              h('li', {}, md('**교차 검증** — 이 카드. 폴드 수만큼 판을 돌려요.')),
+              h('li', {}, md('**feature 기준 교차 검증** — 범주형 속성의 값마다 묶음을 나눠요. 이 데이터에는 범주형 속성이 없어 흐리게 보여요.')),
+              h('li', {}, md('**무작위 샘플링** — 홀드아웃을 여러 번(반복 횟수 10 · 학습 66 %) 하고 점수를 모아요.')),
+              h('li', {}, md('**LOOCV (하나 빼고 검증)** — 폴드 수를 데이터 수만큼. 하나씩 빼고 17번 해요.')),
+              h('li', {}, md('**학습 데이터로 직접 평가** — 배운 데이터로 다시 시험. 처음 보는 데이터에서의 실력은 알 수 없어요.')),
+              h('li', {}, md('**별도 테스트 데이터로 평가** — 떼어 둔 데이터로 시험. 홀드아웃(12번 카드)이에요.'))));
+      }
     }, '교재 23쪽'),
 
     카드('예측해 보기와 주의할 점', '활동', (몸) => {
