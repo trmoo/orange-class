@@ -86,7 +86,12 @@ export function 라디오(이름, 선택지, 처음, 바뀜) {
 export function 흐름조립(단계들, { 열쇠, 팔레트, 높이 = 300, 너비 = 900, 다됨, 미리 = [] } = {}) {
   let 지금 = 0;
   const 줄 = 알림줄();
-  const 캔버스 = s('svg', { viewBox: `0 0 ${너비} ${높이}`, class: 'ow-canvas' });
+  // 위젯 이름은 동그라미 중심에서 48 아래에 적힌다. 맨 아래 위젯의 이름이 캔버스 밖으로 잘리면,
+  // 그만큼을 먼저 맨 위 위젯 위쪽의 빈자리에서 가져오고(캔버스 키가 그대로라 카드가 넘치지 않는다), 모자라면 키를 늘린다.
+  const 높이들 = [...단계들, ...미리].map((d) => d.y);
+  const 넘침 = Math.max(0, Math.max(...높이들) + 58 - 높이);
+  const 위 = Math.min(넘침, Math.max(0, Math.min(...높이들) - 40));
+  const 캔버스 = s('svg', { viewBox: `0 ${위} ${너비} ${높이 + 넘침 - 위}`, class: 'ow-canvas' });
   const 할일줄 = h('div', { class: 'flow-task' });
   const 상자들 = h('div', { class: 'ow-palette' });
   const 놓인 = new Map();

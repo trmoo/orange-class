@@ -276,7 +276,7 @@ export default {
         채우기(그림, 산점도(표.행.map((row, i) => ({ x: row[수면열], y: row[비만열], 색: 나눔.시험.includes(i) ? '#e8702a' : 색들[0], 큰: 나눔.시험.includes(i) })), {
           x이름: '주중평균 전체 (시간)', y이름: '비만율 전체 (%)', 너비: 460, 높이: 290, 반지름: 6, 선: { ...모델, 글: '회귀선' } }).svg,
         h('div', { class: 'legend' }, h('span', { style: { '--c': 색들[0] } }, `훈련 ${나눔.훈련.length}개 (70%)`), h('span', { style: { '--c': '#e8702a' } }, `시험 ${나눔.시험.length}개 (30%)`)));
-        채우기(결과, 시험방식 !== 1 ? h('p', { class: 'feedback bad' }, '💡 따로 떼어 둔 시험 데이터로 평가하려면 Test on test data 를 골라야 해요.')
+        채우기(결과, 시험방식 !== 1 ? h('p', { class: 'feedback bad' }, '💡 떼어 둔 시험 데이터로 평가하려면 맨 아래 「별도 테스트 데이터로 평가」 를 고르세요.')
           : h('table', { class: 'kv' }, h('thead', {}, h('tr', {}, ['Model', 'MSE', 'RMSE', 'MAE', 'R2'].map((t) => h('th', { class: 'num' }, t)))),
             h('tbody', {}, h('tr', { class: 'hl' }, h('td', {}, 'Linear Regression'), [점수.MSE, 점수.RMSE, 점수.MAE, 점수.R2].map((v) => h('td', { class: 'num' }, 수(v, 3)))))));
         if (시험방식 === 1) 마침('u4.model');
@@ -303,15 +303,36 @@ export default {
           h('label', { class: 'ow-radio off' }, h('input', { type: 'checkbox', disabled: true }), ' 층화 샘플링 (가능한 경우)')),
         h('button', { type: 'button', class: 'ow-btn wide', onclick: () => { if (!고정) { 씨앗 = Math.floor(Math.random() * 1e6); 그리기(); } else 그리기(); } }, '데이터 샘플링'),
         h('div', { class: 'ow-foot' }, 줄수));
+      // 한국어판 오렌지의 모델 검증 및 평가 창 — 고를 수 있는 것은 평가 방법뿐이고, 딸린 칸은 화면 모양만 보여 준다
+      const 평가방법 = (글, i, 잠김 = false) => {
+        const 단추 = h('input', { type: 'radio', name: 'tas', checked: i === 0, disabled: 잠김 });
+        if (!잠김) 단추.addEventListener('change', () => { 시험방식 = i === 5 ? 1 : 0; 그리기(); });
+        return h('label', { class: `ow-radio${잠김 ? ' off' : ''}` }, 단추, ` ${글}`);
+      };
+      const 고름 = (글, 값) => h('div', { class: 'ow-sub' }, 글, h('select', { class: 'ow-combo', disabled: true, 'aria-label': 글 }, h('option', {}, 값)));
+      const 상자 = (글, 켬) => h('div', { class: 'ow-sub' }, h('label', { class: 'ow-check' }, h('input', { type: 'checkbox', checked: 켬, disabled: true }), ` ${글}`));
+      const 평가창 = 위젯창({ 이름: 'Test and Score', 제목: '모델 검증 및 평가 (Test and Score)', 작게: true },
+        h('div', { class: 'ow-radios' },
+          평가방법('교차 검증 (Cross validation)', 0),
+          고름('폴드 수: (Number of folds:)', '5'),
+          상자('클래스 비율 유지', false),
+          평가방법('feature 기준 교차 검증', 1, true),
+          h('div', { class: 'ow-sub' }, h('select', { class: 'ow-combo full', disabled: true, 'aria-label': 'feature 기준 교차 검증에 쓸 속성' }, h('option', {}, ''))),
+          평가방법('무작위 샘플링 (Random sampling)', 2),
+          고름('반복 횟수: (Repeat train/test:)', '10'),
+          고름('학습 데이터 비율: (Training set size:)', '66 %'),
+          상자('클래스 비율 유지', true),
+          평가방법('LOOCV (하나 빼고 검증) (Leave one out)', 3),
+          평가방법('학습 데이터로 직접 평가 (Test on train data)', 4),
+          평가방법('별도 테스트 데이터로 평가 (Test on test data)', 5)),
+        결과);
       채우기(몸, h('div', { class: 'ds-grid' },
         h('div', {}, 그림,
-          h('p', { class: 'small muted' }, md(`나온 회귀식: 비만율 = ${수(훈련과시험(표.행, 고정씨앗).모델.기울기, 2)} × 수면 시간 + ${수(훈련과시험(표.행, 고정씨앗).모델.절편, 2)} (고정 표본일 때)`))),
+          h('p', { class: 'small muted' }, md(`나온 회귀식: 비만율 = ${수(훈련과시험(표.행, 고정씨앗).모델.기울기, 2)} × 수면 시간 + ${수(훈련과시험(표.행, 고정씨앗).모델.절편, 2)} (고정 표본일 때)`)),
+          // 모델 검증 및 평가 창이 키가 커서(평가 방법 6가지 + 딸린 칸) 선 잇는 안내는 왼쪽 칸에 둔다
+          h('p', { class: 'small muted' }, md('Data Sampler → Test and Score 선을 두 번 눌러 **Data Sample → Data**, **Remaining Data → Test Data** 로 이어야 시험 데이터로 평가돼요.'))),
         샘플링창,
-        h('div', {},
-          위젯창('Test and Score',
-            묶음상자('', 라디오('tas', ['Cross validation', 'Cross validation by feature', 'Random sampling', 'Leave one out', 'Test on train data', 'Test on test data'], 0, (i) => { 시험방식 = i === 5 ? 1 : 0; 그리기(); })),
-            결과),
-          h('p', { class: 'small muted' }, md('Data Sampler → Test and Score 선을 두 번 눌러 **Data Sample → Data**, **Remaining Data → Test Data** 로 이어야 시험 데이터로 평가돼요.')))));
+        평가창));
     }, '교재 23쪽'),
 
     카드('표본이 바뀌면 결정계수도 바뀔까?', '활동', (몸) => {
