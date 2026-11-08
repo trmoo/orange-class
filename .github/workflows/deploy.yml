@@ -52,7 +52,8 @@ jobs:
           fi
           grep -q '© 2026 티쳐무' "$FILE" || { echo "::error::저작권 표시가 없습니다"; exit 1; }
           # 바깥 자원을 부르면 인터넷 없는 교실에서 깨진다 (w3.org 는 SVG 이름공간이라 내려받지 않는다)
-          OUTSIDE=$(grep -Eo 'https?://[^ "<>)]+' "$FILE" | grep -v 'www.w3.org' | sort -u || true)
+          # jsPDF(4단원 활동 정리 PDF)에 든 주소 셋은 내려받지 않는다 — 이름공간 글자 · 쓰지 않는 미리보기 기능(pdfobject) · core-js 라이선스 주소
+          OUTSIDE=$(grep -Eo 'https?://[^ "<>)]+' "$FILE" | grep -v 'www.w3.org' | grep -v 'jspdf.default.namespaceuri' | grep -v 'cdnjs.cloudflare.com/ajax/libs/pdfobject/' | grep -v 'github.com/zloirock/core-js' | sort -u || true)
           if [ -n "$OUTSIDE" ]; then
             echo "::error::바깥 자원을 참조합니다. 오프라인에서 열리지 않습니다."
             echo "$OUTSIDE"

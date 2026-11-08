@@ -11,7 +11,9 @@ if (크기 < 80000) 잘못.push(`크기가 너무 작다(${크기}바이트) —
 const 저작권 = (글.match(/티쳐무/g) || []).length;
 if (저작권 < 3) 잘못.push(`「티쳐무」가 ${저작권}번뿐 — HTML 주석·배너·푸터 셋은 있어야 한다`);
 if (!글.includes('/*! 오렌지 데이터 교실')) 잘못.push('/*! 배너가 지워졌다 (esbuild.legalComments 확인)');
-if (/<script[^>]+src=|<link[^>]+rel="stylesheet"/.test(글)) 잘못.push('바깥 파일을 부르는 태그가 있다 — 한 파일로 합쳐지지 않았다');
+// 스크립트 안의 글자는 빼고 HTML 쪽 태그만 본다 — jsPDF 코드 속에 「<script src=…」 를 담은 글자열이 있어서(2026-11-09) 그대로 재면 잘못 걸린다
+const 겉 = 글.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, '<script></script>');
+if (/<script[^>]+src=|<link[^>]+rel="stylesheet"/.test(겉)) 잘못.push('바깥 파일을 부르는 태그가 있다 — 한 파일로 합쳐지지 않았다');
 if (/src="\/src\//.test(글)) 잘못.push('/src/main.js 를 부른다 — 개발용 index.html 이다');
 if (existsSync('입장코드.md')) {
   for (const m of readFileSync('입장코드.md', 'utf-8').matchAll(/\*\*([가-힣0-9]{4,})\*\*/g)) if (글.includes(m[1])) 잘못.push(`빌드본에 입장 코드 원문 「${m[1]}」 가 들어 있다`);
