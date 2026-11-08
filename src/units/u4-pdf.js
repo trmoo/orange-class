@@ -58,12 +58,23 @@ const 쉬기 = (ms) => new Promise((r) => setTimeout(r, ms));
 //   html2canvas 가 그리기 전에 배치를 다시 재므로 짧게 쉬기만 한다
 const 그려지기 = () => 쉬기(60);
 
+// ⚠ html2canvas 는 textarea 글을 줄바꿈하지 않고 한 줄로 잘라 그린다(7·15·18번 학생 글이 잘렸다).
+//   뜨기 전에 같은 class(.write)의 글 상자로 바꿔 끼워 학생이 쓴 글이 다 보이게 한다 — 화면 밖 복사본이라 앱 화면은 그대로다
+function 글상자로(판) {
+  for (const 칸 of 판.querySelectorAll('textarea')) {
+    const 상자 = h('div', { class: 칸.className }, 칸.value || 칸.placeholder);
+    Object.assign(상자.style, { whiteSpace: 'pre-wrap', wordBreak: 'keep-all', overflowWrap: 'anywhere', minHeight: `${칸.offsetHeight}px`, boxSizing: 'border-box' });
+    if (!칸.value) 상자.style.color = '#9aa3ad';
+    칸.replaceWith(상자);
+  }
+}
+
 /** 카드 하나를 화면 밖에 그려 그림으로 뜬다 — main.js 의 카드 화면과 같은 모양(폭 1240px) */
 async function 카드들캡처(진행) {
   const 그림들 = [];
   const 카드들 = u4단원.카드.slice(0, 카드수);
   const 뜨기 = async (판) => {
-    await 그려지기(); await 쉬기(30);
+    await 그려지기(); 글상자로(판); await 쉬기(30);
     const 캔버스 = await html2canvas(판, { scale: 1.25, backgroundColor: '#ffffff', logging: false });
     return { 자료: 캔버스.toDataURL('image/jpeg', 0.86), 너비: 캔버스.width, 높이: 캔버스.height };
   };

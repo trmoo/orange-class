@@ -135,10 +135,17 @@ function 점분포(값들, 표시 = []) {
     [0, 0.5, 1].map((v) => s('text', { x: 값X(v), y: 바닥 + 16, 'text-anchor': 'middle', class: 'r2-tick' }, String(v))),
     s('text', { x: 34, y: 바닥 + 16, 'text-anchor': 'middle', class: 'r2-tick' }, '0 미만'),
     점.map(([c, k]) => s('circle', { cx: 칸X(c), cy: 바닥 - 5 - k * 8, r: 3.4, fill: c < 0 ? '#d6454b' : 학습색 })),
-    표시.map((m) => [
-      s('line', { x1: 값X(m.값), x2: 값X(m.값), y1: 14, y2: 바닥, stroke: m.색, 'stroke-width': 2, 'stroke-dasharray': '5 3' }),
-      s('text', { x: 값X(m.값) + (m.쪽 === 'end' ? -4 : 4), y: 12, 'text-anchor': m.쪽 || 'start', class: 'r2-mark', fill: m.색 }, m.글)]));
+    표시.map((m) => {
+      // 오른쪽으로 쓰는 글이 그림 밖(560)으로 나가면 잘리므로(12번 카드 (0.88) 이 잘렸다) 오른쪽 끝에 맞춰 안쪽으로 당긴다
+      let x = 값X(m.값) + (m.쪽 === 'end' ? -4 : 4), 쪽 = m.쪽 || 'start';
+      if (쪽 === 'start' && x + 글폭(m.글) > 556) { x = 556; 쪽 = 'end'; }
+      return [
+        s('line', { x1: 값X(m.값), x2: 값X(m.값), y1: 14, y2: 바닥, stroke: m.색, 'stroke-width': 2, 'stroke-dasharray': '5 3' }),
+        s('text', { x, y: 12, 'text-anchor': 쪽, class: 'r2-mark', fill: m.색 }, m.글)];
+    }));
 }
+// .r2-mark(12px 굵게) 글의 대강 너비 — 한글은 한 자에 약 12.5, 숫자·기호는 약 7.2
+const 글폭 = (t) => [...t].reduce((w, c) => w + (/[ㄱ-힣]/.test(c) ? 12.5 : 7.2), 0);
 
 // 평가 격자 — 한 줄이 한 판(또는 학습·시험), 한 칸이 한 해. 앞해 다음에 (틈을 두고) 뒤해를 둔다.
 // 줄: [{ 이름, 칸: (i) => '학' | '시' | '-', 흐림? }] — 파랑 학습 · 주황 시험 · 회색 쓰지 않음
