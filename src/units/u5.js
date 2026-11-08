@@ -6,9 +6,9 @@
 import { h, 채우기, md, 수 } from '../lib/ui.js';
 import { 퀴즈, 자기평가, 알림줄 } from '../lib/games.js';
 import { 끝냄 } from '../lib/store.js';
-import { 상관, 상관정도, 다중회귀, 다중예측, 성능, 나누기, 단순회귀 } from '../lib/stats.js';
+import { 상관, 상관정도, 다중회귀, 다중예측, 성능, 나누기, 단순회귀, 난수 } from '../lib/stats.js';
 import { 산점도 } from '../lib/chart.js';
-import { 흐름조립, 위젯창, 묶음상자, 라디오, 열고르기, 데이터표 } from '../lib/orange.js';
+import { 흐름조립, 위젯창, 위젯연결도, 묶음상자, 라디오, 열고르기, 데이터표 } from '../lib/orange.js';
 import { 카드, 말풍선, 슬라이더, 교재메모 } from './common.js';
 import { 프로젝트카드 } from './project.js';
 import { 수면비만식생활, 수면열, 비만열, 결식열, 패스트열, 합치기, 수면비만, 식생활표 } from './health.js';
@@ -23,6 +23,26 @@ export function 다중평가(행, 속성들, 씨앗 = 고정씨앗) {
   const X = 행.map((r) => 속성들.map((k) => r[k])), Y = 행.map((r) => r[비만열]);
   const 모델 = 다중회귀(나눔.훈련.map((i) => X[i]), 나눔.훈련.map((i) => Y[i]));
   return { 모델, 점수: 성능(나눔.시험.map((i) => Y[i]), 나눔.시험.map((i) => 다중예측(모델, X[i]))) };
+}
+
+/**
+ * 고른 속성들로 k-겹 교차 검증 — 4단원 교차검증() 과 같은 차례로 섞어 k 묶음에 돌려 담고, 판마다의 예측을 모아 한 번에 점수를 낸다
+ * (오렌지 모델 검증 및 평가의 교차 검증과 같은 셈법). 2026-11-08 사용자 지시로 「어떤 속성을 넣을까?」 부터 이 점수로 견준다.
+ */
+export function 다중교차검증(행, 속성들, k = 5, 씨앗 = 1) {
+  const n = 행.length, rnd = 난수(씨앗);
+  const 섞음 = [...Array(n).keys()];
+  for (let i = n - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [섞음[i], 섞음[j]] = [섞음[j], 섞음[i]]; }
+  const 묶음 = new Array(n);
+  섞음.forEach((v, i) => { 묶음[v] = i % k; });
+  const X = 행.map((r) => 속성들.map((a) => r[a])), Y = 행.map((r) => r[비만열]), 예측 = new Array(n);
+  for (let f = 0; f < k; f++) {
+    const 학습 = [], 시험 = [];
+    for (let i = 0; i < n; i++) (묶음[i] === f ? 시험 : 학습).push(i);
+    const 모델 = 다중회귀(학습.map((i) => X[i]), 학습.map((i) => Y[i]));
+    for (const i of 시험) 예측[i] = 다중예측(모델, X[i]);
+  }
+  return 성능(Y, 예측);
 }
 
 export default {
@@ -57,11 +77,13 @@ export default {
           { id: 'sc', 위젯: 'Select Columns', 부모: ['mg2'], 할일: '분석에 쓸 **속성만 골라요**.', x: 520, y: 250 },
           { id: 'sp', 위젯: 'Scatter Plot', 부모: ['sc'], 할일: '속성끼리의 관계를 **산점도** 로 봐요.', x: 680, y: 140 },
           { id: 'ds', 위젯: 'Data Sampler', 부모: ['sc'], 할일: '**훈련 7 : 시험 3** 으로 나눠요.', x: 680, y: 290 },
-          { id: 'lr', 위젯: 'Linear Regression', 부모: ['ds'], 할일: '**선형 회귀 모델** 을 만들어요. (독립 변수가 여럿이어도 같은 위젯!)', x: 820, y: 200 },
-          { id: 'ts', 위젯: 'Test and Score', 부모: ['lr', 'ds'], 할일: '**결정계수** 로 성능을 확인해요.', x: 840, y: 320 },
+          { id: 'lr', 위젯: 'Linear Regression', 부모: ['ds'], 할일: '**샘플 데이터** 로 **선형 회귀 모델** 을 만들어요. (독립 변수가 여럿이어도 같은 위젯!)', x: 820, y: 200 },
+          // 2026-11-08 사용자 지시 — 4단원 ② 흐름처럼 예측 결과 보기(Predictions)를 기본으로 한다. Test and Score(교차 검증)는 6번 카드 앞에서 바꿔 놓는다
+          { id: 'pr', 위젯: 'Predictions', 부모: ['ds', 'lr'], 할일: '**남은 데이터** 를 예측하고 **성능 점수** 를 확인해요. (4단원 ② 흐름과 같아요)', x: 840, y: 320,
+            오답: { 'Test and Score': '4단원 ② 흐름처럼 먼저 **Predictions** 로 남은 데이터를 예측해 평가해요. Test and Score 의 교차 검증은 뒤 카드에서 바꿔 써요.' } },
         ], {
           열쇠: 'u5.flow', 높이: 360, 너비: 920,
-          팔레트: ['File', 'Data Table', 'Merge Data', 'Select Columns', 'Preprocess', 'Scatter Plot', 'Data Sampler', 'Linear Regression', 'Test and Score', 'k-Means'],
+          팔레트: ['File', 'Data Table', 'Merge Data', 'Select Columns', 'Preprocess', 'Scatter Plot', 'Data Sampler', 'Linear Regression', 'Predictions', 'Test and Score', 'k-Means'],
           미리: [
             { id: 'f1', 위젯: 'File', 부제: '수면', 부모: [], x: 70, y: 60 },
             { id: 'f2', 위젯: 'File', 부제: '비만', 부모: [], x: 70, y: 170 },
@@ -127,6 +149,42 @@ export default {
           h('p', { class: 'small muted' }, '🎯 Axis x 를 바꿔 두 식생활 속성을 모두 확인해 보세요.'))));
     }, '교재 30쪽'),
 
+    // 2026-11-08 사용자 지시 — 성능 평가(다음 카드) 전에 홀드아웃과 교차 검증을 한 번 더 정리하고,
+    //   위젯을 모델 검증 및 평가(Test and Score)의 교차 검증으로 바꿔 다음 활동을 잇는다
+    카드('홀드아웃 vs 교차 검증 — 위젯 바꾸기', '개념', (몸) => {
+      const 표 = 수면비만식생활(), n = 표.행.length;
+      const 두속성 = [결식열, 패스트열];
+      const 홀드 = Array.from({ length: 100 }, (_, i) => 다중평가(표.행, 두속성, i + 1).점수.R2).sort((a, b) => a - b);
+      const 교차 = Array.from({ length: 30 }, (_, i) => 다중교차검증(표.행, 두속성, 5, i + 1).R2).sort((a, b) => a - b);
+      const 시험수 = n - Math.round(n * 0.7);
+      const 행 = (이름, 가, 나) => h('tr', {}, h('th', {}, 이름), h('td', {}, md(가)), h('td', {}, md(나)));
+      채우기(몸, h('div', { class: 'two' },
+        h('div', {},
+          h('table', { class: 'kv small hv-table' },
+            h('thead', {}, h('tr', {}, h('th', {}, ''), h('th', {}, '홀드아웃'), h('th', {}, '교차 검증 (k-겹)'))),
+            h('tbody', {},
+              행('나누는 법', '**한 번** 7 : 3 으로 나눠요', '**k 묶음** 으로 나눠 돌아가며'),
+              행('시험 보는 데이터', `떼어 둔 30 % (${n}개 중 ${시험수}개)`, '**모든 데이터가 한 번씩**'),
+              행('오렌지 위젯', '데이터 샘플링 + **예측 결과 보기**', '**모델 검증 및 평가** 의 교차 검증'),
+              행(`두 식생활 속성 R²`, `100번 나눠 보면 **${수(홀드[0], 2)} ~ ${수(홀드[99], 2)}**`, `30번 섞어 보면 **${수(교차[0], 2)} ~ ${수(교차[29], 2)}**`))),
+          h('p', { class: 'small muted' }, md(`데이터가 **${n}개뿐** 이라 홀드아웃 점수는 크게 흔들려요. 조합을 견주려면 덜 흔들리는 점수가 필요해요.`)),
+          퀴즈([{ 질문: `데이터가 ${n}개뿐인 이번 프로젝트에서 속성 조합을 견줄 때 더 믿을 만한 점수는?`, 보기: ['교차 검증 — 모든 데이터가 한 번씩 시험을 본다', `홀드아웃 — 떼어 둔 ${시험수}개로 한 번만 잰다`], 답: 0,
+            해설: '교차 검증은 운 좋은 묶음·운 나쁜 묶음이 고르게 섞여 덜 흔들려요.' }], { 열쇠: 'u5.cv-q' })),
+        h('div', {},
+          h('p', { class: 'small' }, md('그래서 다음 카드부터는 **예측 결과 보기** 를 **모델 검증 및 평가 (Test and Score)** 로 바꿔요. **열 선택 → 데이터**, **선형회귀 → 학습 알고리즘** 으로 잇고, 창에서 **교차 검증 · 폴드 수 5** 를 골라요.')),
+          위젯연결도([
+            { id: 'sc', 위젯: 'Select Columns', 이름줄: ['열 선택'], x: 60, y: 40 },
+            { id: 'lr', 위젯: 'Linear Regression', 이름줄: ['선형회귀'], x: 60, y: 128 },
+            { id: 'ts', 위젯: 'Test and Score', 이름줄: ['모델 검증 및 평가', '(Test and Score)'], x: 300, y: 84 },
+          ], [
+            { 부터: 'sc', 까지: 'ts', 글: '데이터 (Data)' },
+            { 부터: 'lr', 까지: 'ts', 글: '학습 알고리즘 (Learner)' },
+          ], { 너비: 380, 높이: 176, 키: 175 }),
+          위젯창({ 이름: 'Test and Score', 제목: '모델 검증 및 평가 (Test and Score)', 작게: true },
+            h('label', { class: 'ow-radio' }, h('input', { type: 'radio', checked: true, disabled: true }), ' 교차 검증 (Cross validation)'),
+            h('div', { class: 'ow-sub' }, '폴드 수: (Number of folds:)', h('select', { class: 'ow-combo', disabled: true, 'aria-label': '폴드 수' }, h('option', {}, '5')))))));
+    }, '교재 31쪽'),
+
     카드('단계 5 · 어떤 속성을 넣을까?', '오렌지', (몸) => {
       const 표 = 수면비만식생활();
       const 고른 = new Set([결식열, 패스트열]);
@@ -135,7 +193,8 @@ export default {
       const 그리기 = () => {
         const 속성들 = [수면열, 결식열, 패스트열].filter((k) => 고른.has(k));
         if (!속성들.length) { 채우기(결과, h('p', { class: 'feedback bad' }, '독립 변수를 하나 이상 골라 주세요.')); return; }
-        const { 점수 } = 다중평가(표.행, 속성들);
+        // 앞 카드에서 바꾼 위젯 — 모델 검증 및 평가의 교차 검증(5겹, 섞는 차례 고정)으로 잰다
+        const 점수 = 다중교차검증(표.행, 속성들, 5, 1);
         기록.set(속성들.map((k) => 짧은이름[k]).join(' + '), 점수.R2);
         채우기(결과, h('table', { class: 'kv' }, h('thead', {}, h('tr', {}, ['Model', 'MSE', 'RMSE', 'MAE', 'R2'].map((t) => h('th', { class: 'num' }, t)))),
           h('tbody', {}, h('tr', { class: 'hl' }, h('td', {}, 'Linear Regression'), [점수.MSE, 점수.RMSE, 점수.MAE, 점수.R2].map((v) => h('td', { class: 'num' }, 수(v, 3)))))));
@@ -151,13 +210,13 @@ export default {
       그리기();
       채우기(몸, h('div', { class: 'two' },
         h('div', {},
-          h('p', {}, md('Select Columns 의 **Features** 를 바꿔 가며 Test and Score 의 **R²** 를 견주어 보세요. (표본은 고정)')),
+          h('p', {}, md('Select Columns 의 **Features** 를 바꿔 가며 모델 검증 및 평가(**교차 검증 5겹**)의 **R²** 를 견주어 보세요.')),
           위젯창('Select Columns', 묶음상자('Features', 상자들)),
-          위젯창('Test and Score', h('p', { class: 'small' }, 'Test on test data'), 결과)),
+          위젯창({ 이름: 'Test and Score', 제목: '모델 검증 및 평가 (Test and Score)', 작게: true }, h('p', { class: 'small' }, '◉ 교차 검증 (Cross validation) · 폴드 수 5'), 결과)),
         h('div', {},
           h('b', {}, '📒 해 본 조합 (R² 높은 순)'), 기록표,
           h('p', { class: 'small muted' }, '🎯 네 가지 이상 조합을 해 보세요.'),
-          퀴즈([{ 질문: '조합을 바꿔 보니 알 수 있는 것은?', 보기: ['독립 변수를 많이 넣을수록 R² 가 늘 높아진다', '속성을 더 넣는다고 시험 데이터의 R² 가 늘 좋아지지는 않는다'], 답: 1, 해설: '겹치는 정보를 넣거나 데이터가 적으면 오히려 나빠질 수 있어요. 여러 조합을 견주어 골라야 해요.' }], { 열쇠: 'u5.compare-q' }))));
+          퀴즈([{ 질문: '조합을 바꿔 보니 알 수 있는 것은?', 보기: ['독립 변수를 많이 넣을수록 R² 가 늘 높아진다', '속성을 더 넣는다고 교차 검증 R² 가 늘 좋아지지는 않는다'], 답: 1, 해설: '겹치는 정보를 넣거나 데이터가 적으면 오히려 나빠질 수 있어요. 여러 조합을 견주어 골라야 해요.' }], { 열쇠: 'u5.compare-q' }))));
     }, '교재 31·33쪽'),
 
     카드('독립 변수끼리는 어떤 사이일까?', '활동', (몸) => {
@@ -208,11 +267,11 @@ export default {
 
     카드('단계 6 · 결과 해석과 나누기', '활동', (몸) => {
       const 표 = 수면비만식생활();
-      const { 점수 } = 다중평가(표.행, [결식열, 패스트열]);
+      const 점수 = 다중교차검증(표.행, [결식열, 패스트열], 5, 1);
       채우기(몸, h('div', { class: 'two' },
         h('div', {},
           말풍선('🧑‍🎓', '채원', '살이 빠진 것도 좋지만, 몸과 마음이 건강해진 게 더 좋아! 다음에 중요한 결정을 할 때도 데이터를 먼저 봐야겠어.'),
-          h('p', {}, md(`이 연습 데이터에서 두 식생활 속성으로 만든 모델의 결정계수는 **${수(점수.R2, 3)}** 이에요.`)),
+          h('p', {}, md(`이 연습 데이터에서 두 식생활 속성으로 만든 모델을 **교차 검증(5겹)** 으로 잰 결정계수는 **${수(점수.R2, 3)}** 이에요.`)),
           교재메모('교재는 R² 0.897 을 「비만을 89.7%까지 예측할 수 있다」 고 풀이했어요. 더 정확히 말하면 **비만율이 해마다 달라진 정도(흩어짐)의 약 90%를 이 두 속성으로 설명한다** 는 뜻이에요. 한 사람의 비만을 90% 확률로 맞힌다는 뜻은 아니에요.')),
         h('div', {},
           퀴즈([

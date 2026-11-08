@@ -406,3 +406,16 @@ code { background: #f3eee8; border-radius: 5px; padding: 1px 6px; font-family: C
 .outfit-grid.one-row .outfits .chip.small { padding: 1px 6px; font-size: .74rem; }
 .kv.month-grid td, .kv.month-grid th { padding: 1px 4px; }
 .outfit-stat { font-size: .76rem; line-height: 1.35; }
+/* 4단원 11번 — 학습지(PDF) 꼴의 두 표. 칸이 많아 입력칸과 머리글을 줄인다 */
+.kv.pdf-table th, .kv.pdf-table td { padding: 3px 4px; text-align: center; vertical-align: middle; }
+.kv.pdf-table th small { font-weight: 400; font-size: .72rem; line-height: 1.15; display: inline-block; }
+.kv.pdf-table .blank { width: 4.4em; padding: 2px 3px; }
+.pred-card .write-label { margin: 2px 0; }
+/* ⭐ 심화 카드 — 4단원 맨 끝 「심화 · 교차 검증과 평가 방법 견주기」 (2026-11-08) */
+.card.k-심화 .card-kind { background: #fdeaf4; color: #a1286c; }
+.cdot.k-심화:not(.on) { border-color: #d77aa9; }
+/* 4단원 11번 — 고정 비율 막대(50~90 %)와 「12번부터는 70 %」 안내 */
+.ow-pct { min-width: 3.2em; text-align: right; font-variant-numeric: tabular-nums; }
+.fig-cap.ratio-note { color: #8a5200; }
+/* 쓰기 칸 아래 예시 답안 — 5글자 이상 쓰면 보인다 */
+.answer-box { margin: 4px 0 0; padding: 5px 12px; font-weight: 600; font-size: .92rem; }

@@ -4,7 +4,7 @@
  *  데이터는 연습용으로 새로 만든 값이다(src/data/health.js).
  */
 import { h, s, 채우기, md, 수, 창 } from '../lib/ui.js';
-import { 퀴즈, 순서, 쓰기, 자기평가, 알림줄 } from '../lib/games.js';
+import { 퀴즈, 순서, 짝짓기, 쓰기, 자기평가, 알림줄 } from '../lib/games.js';
 import { 끝냄, 끝났나, 글읽기, 글쓰기 } from '../lib/store.js';
 import { 상관, 상관정도, 단순회귀, 성능, 나누기, 난수, 백분율오차 } from '../lib/stats.js';
 import { 산점도, 색들 } from '../lib/chart.js';
@@ -19,9 +19,10 @@ const 표값 = (표) => 표.행.map((r) => 표.열.map((k) => r[k]));
 
 // Data Sampler 「Replicable (deterministic) sampling」 을 켰을 때 쓰는 씨앗
 const 고정씨앗 = 4;
-export function 훈련과시험(행, 씨앗) {
+// 비율: 샘플 데이터 비율(기본 70 %). 오렌지처럼 샘플 수를 올림으로 센다 — 17개의 70 % 는 반올림·올림 모두 12개라 뒤 카드 값은 그대로다
+export function 훈련과시험(행, 씨앗, 비율 = 0.7) {
   const x = 행.map((r) => r[수면열]), y = 행.map((r) => r[비만열]);
-  const 나눔 = 나누기(행.length, 0.7, 씨앗);
+  const 나눔 = 나누기(행.length, 비율, 씨앗, true);
   const 모델 = 단순회귀(나눔.훈련.map((i) => x[i]), 나눔.훈련.map((i) => y[i]));
   const 점수 = 성능(나눔.시험.map((i) => y[i]), 나눔.시험.map((i) => 모델.절편 + 모델.기울기 * x[i]));
   return { 나눔, 모델, 점수, x, y };
@@ -55,6 +56,20 @@ export function 교차검증(행, k, 씨앗 = 1) {
 }
 
 /**
+ * 모델 검증 및 평가(Test and Score) 의 평가 방법마다 나오는 점수.
+ * train: 전체로 배우고 전체로 잼(10번 카드 ① 통계적) · cv: 전체를 k-겹으로 돌아가며 · loo: 하나씩 빼고 ·
+ * test: 샘플 데이터로 배우고 남은 데이터로 잼(13번 카드, 12번 카드의 예측 결과 보기와 같은 점수)
+ */
+export function 평가방법점수(행, 방법, k = 5, 씨앗 = 1) {
+  if (방법 === 'test') return 훈련과시험(행, 고정씨앗).점수;
+  if (방법 === 'loo') return 교차검증(행, 행.length).점수;
+  if (방법 === 'cv') return 교차검증(행, k, 씨앗).점수;
+  const x = 행.map((r) => r[수면열]), y = 행.map((r) => r[비만열]);
+  const m = 단순회귀(x, y);
+  return 성능(y, x.map((v) => m.절편 + m.기울기 * v));
+}
+
+/**
  * 예측 결과 보기(Predictions) 창에 나오는 시험 데이터 줄 — 오렌지의 error 는 「차이 (예측값 - 실제값)」 라서
  * stats.js 의 성능()(실제값 − 예측값) 과 부호가 반대다. 점수에는 MAPE·sMAPE 도 함께 담는다.
  */
@@ -70,7 +85,7 @@ export function 시험예측(행, 씨앗 = 고정씨앗) {
 /**
  * 같은 데이터를 두 가지로 분석한 점수.
  *  통계: 데이터 전체로 회귀식을 만들고 그 전체로 다시 잰다(오렌지 「학습 데이터로 직접 평가」).
- *  기계: 7 : 3 으로 나눠 70 % 로 학습하고, 학습에 안 쓴 30 % 로 잰다(고정 씨앗 — 10번 카드와 같은 표본).
+ *  기계: 7 : 3 으로 나눠 70 % 로 학습하고, 학습에 안 쓴 30 % 로 잰다(고정 씨앗 — 11번 카드와 같은 표본).
  *  나쁜MSE·나쁜R2: 씨앗 1~번 으로 나눠 본 기계학습 점수 가운데 통계적 점수보다 나빴던 횟수(홀드아웃 카드와 같은 씨앗).
  */
 export function 두분석(행, 씨앗 = 고정씨앗, 번 = 100) {
@@ -124,21 +139,60 @@ function 점분포(값들, 표시 = []) {
       s('text', { x: 값X(m.값) + (m.쪽 === 'end' ? -4 : 4), y: 12, 'text-anchor': m.쪽 || 'start', class: 'r2-mark', fill: m.색 }, m.글)]));
 }
 
-// 교차 검증 격자 — 한 줄이 한 판, 한 칸이 한 해. 주황이 그 판의 시험 데이터. 아직 안 한 판은 흐리게 그린다
-function 교차격자(cv, 끝낸, 해들) {
-  const k = cv.판들.length, n = 해들.length;
-  const 왼 = 46, 칸w = (560 - 왼 - 2) / n, 칸h = Math.min(24, 210 / k), 위 = 18;
+// 평가 격자 — 한 줄이 한 판(또는 학습·시험), 한 칸이 한 해. 앞해 다음에 (틈을 두고) 뒤해를 둔다.
+// 줄: [{ 이름, 칸: (i) => '학' | '시' | '-', 흐림? }] — 파랑 학습 · 주황 시험 · 회색 쓰지 않음
+function 평가격자(줄들, 앞해, 뒤해 = [], { 앞이름 = '', 뒤이름 = '' } = {}) {
+  const 해들 = [...앞해, ...뒤해], n = 해들.length, 틈 = 뒤해.length ? 10 : 0;
+  const 왼 = 46, 칸w = (560 - 왼 - 2 - 틈) / n, 칸h = Math.min(24, 150 / 줄들.length), 위 = 앞이름 ? 30 : 18;
+  const x = (i) => 왼 + i * 칸w + (i >= 앞해.length ? 틈 : 0);
   const 글크기 = Math.min(12, 칸h - 1);
-  return s('svg', { viewBox: `0 0 560 ${위 + k * 칸h + 2}`, class: 'cv-grid', role: 'img', 'aria-label': `${k}겹 교차 검증 — ${끝낸}판까지 함` },
-    해들.map((t, i) => s('text', { x: 왼 + (i + 0.5) * 칸w, y: 12, 'text-anchor': 'middle', class: 'cv-year' }, t)),
-    cv.판들.map((판, f) => {
-      const y = 위 + f * 칸h, 됨 = f < 끝낸;
-      return s('g', { opacity: 됨 ? 1 : 0.2 },
-        s('text', { x: 왼 - 6, y: y + 칸h / 2 + 글크기 * 0.35, 'text-anchor': 'end', class: 'cv-round', 'font-size': 글크기 }, `${f + 1}판`),
-        해들.map((_, i) => s('rect', { x: 왼 + i * 칸w + 1, y: y + 1, width: 칸w - 2, height: 칸h - 2, rx: 3, fill: 판.시험.includes(i) ? 시험색 : 학습색,
-          stroke: f === 끝낸 - 1 ? '#222' : 'none', 'stroke-width': 1.5 })));
+  const 색 = { 학: 학습색, 시: 시험색, '-': '#e4e4e4' };
+  return s('svg', { viewBox: `0 0 560 ${위 + 줄들.length * 칸h + 2}`, class: 'cv-grid', role: 'img', 'aria-label': `평가 격자 — ${줄들.length}줄` },
+    앞이름 ? s('text', { x: x(0), y: 10, class: 'cv-year', 'font-weight': 700 }, 앞이름) : null,
+    뒤이름 ? s('text', { x: x(앞해.length), y: 10, class: 'cv-year', 'font-weight': 700 }, 뒤이름) : null,
+    해들.map((t, i) => s('text', { x: x(i) + 칸w / 2, y: 위 - 6, 'text-anchor': 'middle', class: 'cv-year' }, t)),
+    줄들.map((줄, f) => {
+      const y = 위 + f * 칸h;
+      return s('g', { opacity: 줄.흐림 ? 0.2 : 1 },
+        s('text', { x: 왼 - 6, y: y + 칸h / 2 + 글크기 * 0.35, 'text-anchor': 'end', class: 'cv-round', 'font-size': 글크기 }, 줄.이름),
+        해들.map((_, i) => s('rect', { x: x(i) + 1, y: y + 1, width: 칸w - 2, height: 칸h - 2, rx: 3, fill: 색[줄.칸(i)] })));
     }));
 }
+
+/**
+ * 한국어판 「모델 검증 및 평가 (Test and Score)」 창 — 평가 방법 여섯 가지와 딸린 칸.
+ * 방법 열쇠: cv 교차 검증 · feature · random 무작위 샘플링 · loo · train 학습 데이터로 직접 평가 · test 별도 테스트 데이터로 평가.
+ * 켬 에 든 방법만 고를 수 있고, 고르면 바뀜(열쇠) 을 부른다. 간단: true 면 흐린 방법의 딸린 칸을 빼서 창을 짧게 한다.
+ * 폴드칸 을 주면 폴드 수를 그 칸(고를 수 있는 select)으로 둔다.
+ */
+function 평가창({ 이름 = 'tas', 처음 = 'cv', 켬 = ['cv', 'random', 'loo', 'train', 'test'], 바뀜, 폴드칸, 간단 = false } = {}, ...아래) {
+  const 방법 = (열쇠, 글) => {
+    const 잠김 = !켬.includes(열쇠);
+    const b = h('input', { type: 'radio', name: 이름, checked: 열쇠 === 처음, disabled: 잠김 });
+    if (!잠김) b.addEventListener('change', () => 바뀜?.(열쇠));
+    return h('label', { class: `ow-radio${잠김 ? ' off' : ''}` }, b, ` ${글}`);
+  };
+  const 고름 = (글, 값) => h('div', { class: 'ow-sub' }, 글, h('select', { class: 'ow-combo', disabled: true, 'aria-label': 글 }, h('option', {}, 값)));
+  const 상자 = (글, 켬2) => h('div', { class: 'ow-sub' }, h('label', { class: 'ow-check' }, h('input', { type: 'checkbox', checked: 켬2, disabled: true }), ` ${글}`));
+  return 위젯창({ 이름: 'Test and Score', 제목: '모델 검증 및 평가 (Test and Score)', 작게: true },
+    h('div', { class: 'ow-radios' },
+      방법('cv', '교차 검증 (Cross validation)'),
+      폴드칸 ? h('div', { class: 'ow-sub' }, '폴드 수: (Number of folds:)', 폴드칸) : 고름('폴드 수: (Number of folds:)', '5'),
+      간단 ? null : 상자('클래스 비율 유지', false),
+      방법('feature', 'feature 기준 교차 검증'),
+      간단 ? null : h('div', { class: 'ow-sub' }, h('select', { class: 'ow-combo full', disabled: true, 'aria-label': 'feature 기준 교차 검증에 쓸 속성' }, h('option', {}, ''))),
+      방법('random', '무작위 샘플링 (Random sampling)'),
+      간단 ? null : [고름('반복 횟수: (Repeat train/test:)', '10'), 고름('학습 데이터 비율: (Training set size:)', '66 %'), 상자('클래스 비율 유지', true)],
+      방법('loo', 'LOOCV (하나 빼고 검증) (Leave one out)'),
+      방법('train', '학습 데이터로 직접 평가 (Test on train data)'),
+      방법('test', '별도 테스트 데이터로 평가 (Test on test data)')),
+    ...아래);
+}
+
+/** 모델 검증 및 평가 창 아래의 점수 표 한 줄 */
+const 점수표 = (p) => h('table', { class: 'kv small score-row' },
+  h('thead', {}, h('tr', {}, ['Model', 'MSE', 'RMSE', 'MAE', 'R2'].map((t) => h('th', { class: t === 'Model' ? '' : 'num' }, t)))),
+  h('tbody', {}, h('tr', { class: 'hl' }, h('td', {}, '선형회귀'), [p.MSE, p.RMSE, p.MAE, p.R2].map((v) => h('td', { class: 'num' }, 수(v, 3))))));
 
 // csv 를 파일로 내려받게 한다 — 앞에 BOM 을 붙여야 엑셀로 열 때 한글이 깨지지 않는다
 function csv내려받기(자료) {
@@ -364,14 +418,14 @@ export default {
       const 확인 = () => {
         const 글 = 기준칸.value.replace(/[\s「」"'()]/g, '');
         if (!글) { 답줄.틀림('속성 이름을 먼저 적어 보세요.'); return; }
-        if (글.includes('시점')) 답줄.맞음('맞아요! 두 파일 모두 첫 열이 **시점(연도)** 이라, 같은 해끼리 짝지어 한 줄로 합칠 수 있어요.');
-        else if (/연도|년도/.test(글)) 답줄.맞음('맞아요, 연도예요! 다만 두 파일 속 속성 이름은 **「시점」** 이에요. 오렌지에서는 그 이름을 골라요.');
+        if (글.includes('시점')) 답줄.맞음('맞아요! 기준 속성은 **시점** 이에요. 그 까닭은 (2) 에 적어 보세요.');
+        else if (/연도|년도/.test(글)) 답줄.맞음('맞아요, 연도예요! 다만 파일 속 속성 이름은 **「시점」** 이에요.');
         else { 답줄.틀림('두 파일에 **똑같이 들어 있는** 속성을 찾아보세요. 수면 시간 파일과 비만율 파일의 **첫 열** 을 견주어 보면 보여요.'); return; }
         기준 = true; 마침('u4.merge-key'); 그리기();
       };
       기준칸.addEventListener('keydown', (e) => { if (e.key === 'Enter') 확인(); });
       그리기();
-      if (기준) 답줄.맞음('기준 속성: **시점** — 같은 해끼리 짝지어 합쳐요.');
+      if (기준) 답줄.맞음('기준 속성: **시점**');
       채우기(몸, h('div', { class: 'two' },
         h('div', {},
           위젯연결도([
@@ -381,12 +435,14 @@ export default {
           ], [
             { 부터: 'f1', 까지: 'mg', 글: '데이터 (Data)' },
             { 부터: 'f2', 까지: 'mg', 글: '데이터 (Data) → Extra Data' },
-          ], { 너비: 336, 높이: 192, 키: 192 }),
+          ], { 너비: 336, 높이: 192, 키: 138 }),
           h('p', { class: 'small muted fig-cap' }, '파일 불러오기 (File) 위젯 두 개를 데이터 병합(열/조인) (Merge Data) 위젯에 연결하기'),
           h('label', { class: 'write-wrap' }, h('span', { class: 'write-label' }, md('**(1)** 비만율 데이터와 수면시간 데이터는 **어떤 속성** 을 기준으로 하나로 통합할 수 있을까요?')),
             h('div', { class: 'row' }, 기준칸, h('button', { type: 'button', class: 'btn primary', onclick: 확인 }, '확인'))),
           답줄,
-          쓰기('u4.merge-why', { 안내: '**(2)** 그 속성을 기준으로 정한 이유를 적어 보세요.', 줄수: 2 })),
+          // 2026-11-09 사용자 지시 — 5글자 이상 쓰면 예시 답안이 칸 아래에 나온다
+          쓰기('u4.merge-why', { 안내: '**(2)** 그 속성을 기준으로 정한 이유를 적어 보세요.', 줄수: 2,
+            답안: '두 파일에 모두 있는 **시점(연도)** 으로 같은 해의 수면 시간과 비만율을 한 줄로 짝지을 수 있으니까.' })),
         h('div', {},
           위젯창({ 이름: 'Merge Data', 제목: '데이터 병합(열/조인) (Merge Data)', 작게: true },
             묶음상자('병합 방식', 라디오('merge', ['추가 데이터(Extra)의 열 덧붙이기 (Left Join)', '일치하는 행 쌍만 찾기 (Inner Join)', '테이블 이어붙이기 (Outer Join)'], 0, (i) => { 방식 = i; 그리기(); })),
@@ -437,32 +493,81 @@ export default {
           ], { 열쇠: 'u4.scatter-q' }))));
     }, '교재 22쪽'),
 
-    카드('단계 5 · 모델 만들고 성능 확인', '오렌지', (몸) => {
+    // ① 통계적 회귀 분석 — 6번 카드 ① 흐름. 데이터 전체(17개)로 회귀식을 만들고, 모델 검증 및 평가의 「학습 데이터로 직접 평가」 로
+    //   그 식이 같은 데이터를 얼마나 잘 설명하는지 본다. 2026-11-08 사용자 정정 지시로 10~13번을 이렇게 나눴다:
+    //   10 ① 통계적(Test and Score · 학습 데이터로 직접 평가) → 11·12 ② 기계학습(홀드아웃 + 예측 결과 보기) →
+    //   13 Test and Score 로 하는 ② (별도 테스트 데이터로 평가, 선 바꿔 잇기) → … → 맨 끝 ⭐ 심화 교차 검증
+    카드('단계 5 · ① 통계적 회귀 분석 — 모델 검증 및 평가', '오렌지', (몸) => {
       const 표 = 수면비만();
-      let 고정 = true, 씨앗 = 고정씨앗, 시험방식 = 0;
-      const 그림 = h('div', {}), 결과 = h('div', {});
-      const 줄수 = h('span', { class: 'ow-count', title: '들어온 줄 수 · 나간 줄 수 (뽑힌 것 | 남은 것)' });
-      const 그리기 = () => {
-        const { 나눔, 모델, 점수 } = 훈련과시험(표.행, 씨앗);
-        채우기(줄수, `⇥ ${표.행.length}  ↦ ${나눔.훈련.length} | ${나눔.시험.length}`);
-        채우기(그림, 산점도(표.행.map((row, i) => ({ x: row[수면열], y: row[비만열], 색: 나눔.시험.includes(i) ? '#e8702a' : 색들[0], 큰: 나눔.시험.includes(i) })), {
-          x이름: '주중평균 전체 (시간)', y이름: '비만율 전체 (%)', 너비: 460, 높이: 290, 반지름: 6, 선: { ...모델, 글: '회귀선' } }).svg,
-        h('div', { class: 'legend' }, h('span', { style: { '--c': 색들[0] } }, `훈련 ${나눔.훈련.length}개 (70%)`), h('span', { style: { '--c': '#e8702a' } }, `시험 ${나눔.시험.length}개 (30%)`)));
-        채우기(결과, 시험방식 !== 1 ? h('p', { class: 'feedback bad' }, '💡 떼어 둔 시험 데이터로 평가하려면 맨 아래 「별도 테스트 데이터로 평가」 를 고르세요.')
-          : h('table', { class: 'kv' }, h('thead', {}, h('tr', {}, ['Model', 'MSE', 'RMSE', 'MAE', 'R2'].map((t) => h('th', { class: 'num' }, t)))),
-            h('tbody', {}, h('tr', { class: 'hl' }, h('td', {}, 'Linear Regression'), [점수.MSE, 점수.RMSE, 점수.MAE, 점수.R2].map((v) => h('td', { class: 'num' }, 수(v, 3)))))));
-        if (시험방식 === 1) 마침('u4.model');
+      const x = 표.행.map((r) => r[수면열]), y = 표.행.map((r) => r[비만열]);
+      const 식 = 단순회귀(x, y), 통계 = 평가방법점수(표.행, 'train');
+      const 결과 = h('div', {}), 줄 = 알림줄();
+      const 안내 = {
+        cv: '교차 검증은 맨 끝 **⭐ 심화 카드** 에서 다뤄요. 통계적 회귀 분석은 **전체 데이터로 만든 회귀식** 을 **같은 데이터** 로 확인해요.',
+        random: '무작위 샘플링은 데이터를 나눠 시험하는 방법이에요. 통계적 회귀 분석은 데이터를 **나누지 않아요**.',
+        loo: 'LOOCV 도 데이터를 나눠 돌아가며 시험하는 교차 검증이에요. 맨 끝 **⭐ 심화 카드** 에서 다뤄요.',
+        test: '이 흐름에는 **테스트 데이터** 가 이어져 있지 않아요. 떼어 둔 데이터로 시험하는 것은 **② 기계학습 기반 회귀 분석**(11~13번 카드)이에요.',
       };
+      const 바뀜 = (m) => {
+        if (m === 'train') {
+          채우기(결과, 점수표(통계));
+          줄.맞음(`R² **${수(통계.R2, 3)}** — 회귀식이 비만율 변화의 약 **${Math.round(통계.R2 * 100)} %** 를 설명해요(**설명력**).`);
+          마침('u4.model');
+        } else { 채우기(결과); 줄.틀림(안내[m]); }
+      };
+      if (끝났나('u4.model')) 채우기(결과, 점수표(통계));
+      채우기(몸, h('div', { class: 'two' },
+        h('div', {},
+          h('div', { class: 'concept' }, md(`**① 통계적 회귀 분석** — 데이터를 나누지 않고 **전체 ${표.행.length}개** 로 회귀식을 만들고, 그 식이 데이터를 얼마나 잘 설명하는지 확인해요. 오른쪽 창에서 **알맞은 평가 방법** 을 골라 보세요.`)),
+          산점도(표.행.map((row) => ({ x: row[수면열], y: row[비만열], 제목: `${row.시점}년` })), {
+            x이름: '주중평균 전체 (시간)', y이름: '비만율 전체 (%)', 너비: 560, 높이: 175, 반지름: 6, 선: { ...식, 글: '회귀선' } }).svg,
+          h('p', { class: 'small muted' }, md(`회귀식: 비만율 = ${수(식.기울기, 2)} × 수면 시간 + ${수(식.절편, 2)} (전체 ${표.행.length}개로 만듦)`)),
+          위젯연결도([
+            { id: 'sc', 위젯: 'Select Columns', 이름줄: ['열 선택'], x: 60, y: 40 },
+            { id: 'lr', 위젯: 'Linear Regression', 이름줄: ['선형회귀'], x: 60, y: 128 },
+            { id: 'ts', 위젯: 'Test and Score', 이름줄: ['모델 검증 및 평가', '(Test and Score)'], x: 300, y: 84 },
+          ], [
+            { 부터: 'sc', 까지: 'ts', 글: '데이터 (Data)' },
+            { 부터: 'lr', 까지: 'ts', 글: '학습 알고리즘 (Learner)' },
+          ], { 너비: 380, 높이: 176, 키: 155 })),
+        h('div', {},
+          평가창({ 이름: 'tas-stat', 바뀜 }, 결과),
+          줄)));
+    }, '교재 23쪽'),
+
+    // ② 기계학습 기반 회귀 분석 (1) — 홀드아웃: 데이터 샘플링으로 데이터를 나눠 두기. 학습지(PDF) STEP 1 의 행 수 읽기 문항을 둔다
+    카드('② 기계학습 기반 회귀 분석 (1) — 홀드아웃으로 데이터 나누기', '오렌지', (몸) => {
+      const 표 = 수면비만();
+      // 고정 비율 막대는 이 카드 안에서만 움직인다(2026-11-08 사용자 지시) — 50~90 %. 12번 카드부터는 70 % 로 나눈 고정 표본으로 셈한다
+      let 고정 = true, 씨앗 = 고정씨앗, 비율 = 70;
+      const 그림 = h('div', {});
+      const 줄수 = h('span', { class: 'ow-count', title: '들어온 줄 수 · 나간 줄 수 (샘플 데이터 | 남은 데이터)' });
+      const 비율글 = h('span', { class: 'ow-pct' }, '70 %');
+      // 막대를 70 % 에서 옮기면 오른쪽 아래 설명 줄을 「12번부터는 70 %」 안내로 바꾼다(창 안에 넣으면 카드가 넘친다)
+      const 비율알림 = h('p', { class: 'small muted fig-cap' });
+      const 그리기 = () => {
+        const { 나눔, 모델 } = 훈련과시험(표.행, 씨앗, 비율 / 100);
+        채우기(줄수, `⇥ ${표.행.length}  ↦ ${나눔.훈련.length} | ${나눔.시험.length}`);
+        채우기(비율글, `${비율} %`);
+        비율알림.classList.toggle('ratio-note', 비율 !== 70);
+        채우기(비율알림, md(비율 === 70 ? '6번 카드 ② 흐름 그대로예요. 점수는 다음 카드의 **예측 결과 보기** 에서 확인해요.'
+          : `⚠ **12번 카드부터는 70 %** 로 나눈 표본으로 셈해요. 오렌지에서도 70 % 로 맞춰 두세요.`));
+        채우기(그림, 산점도(표.행.map((row, i) => ({ x: row[수면열], y: row[비만열], 색: 나눔.시험.includes(i) ? 시험색 : 학습색, 큰: 나눔.시험.includes(i) })), {
+          x이름: '주중평균 전체 (시간)', y이름: '비만율 전체 (%)', 너비: 460, 높이: 245, 반지름: 6, 선: { ...모델, 글: '회귀선' } }).svg,
+        h('div', { class: 'legend' }, h('span', { style: { '--c': 학습색 } }, `샘플 데이터 ${나눔.훈련.length}개 (${비율} %) — 배우기`), h('span', { style: { '--c': 시험색 } }, `남은 데이터 ${나눔.시험.length}개 (${100 - 비율} %) — 시험`)));
+      };
+      const 비율막대 = h('input', { type: 'range', class: 'ow-slider', min: 50, max: 90, step: 5, value: 70, 'aria-label': '고정 비율', title: '이 카드에서는 50~90 % 사이로 움직여요' });
+      비율막대.addEventListener('input', () => { 비율 = Number(비율막대.value); 그리기(); });
       const 고정상자 = h('input', { type: 'checkbox', checked: true });
       고정상자.addEventListener('change', () => { 고정 = 고정상자.checked; if (고정) { 씨앗 = 고정씨앗; 그리기(); } });
       그리기();
-      // 한국어판 오렌지의 데이터 샘플링 창 — 이 활동에서 쓰는 것은 「고정 비율 70 %」 와 「재현 가능한 샘플링」 뿐이라 나머지는 잠가 둔다
+      // 한국어판 오렌지의 데이터 샘플링 창 — 이 활동에서 쓰는 것은 「고정 비율」 과 「재현 가능한 샘플링」 뿐이라 나머지는 잠가 둔다
       const 끔 = (글) => h('label', { class: 'ow-radio off' }, h('input', { type: 'radio', disabled: true }), ` ${글}`);
       const 칸 = (글, 값) => h('div', { class: 'ow-sub' }, 글, h('input', { type: 'number', class: 'ow-spin', value: 값, disabled: true, 'aria-label': 글 }));
       const 샘플링창 = 위젯창({ 이름: 'Data Sampler', 제목: '데이터 샘플링 (Data Sampler)', 작게: true },
         묶음상자('샘플링 유형',
           h('label', { class: 'ow-radio' }, h('input', { type: 'radio', checked: true, disabled: true }), ' 데이터의 고정 비율:'),
-          h('div', { class: 'ow-sub' }, h('input', { type: 'range', class: 'ow-slider', min: 0, max: 100, value: 70, disabled: true, 'aria-label': '고정 비율' }), h('span', {}, '70 %')),
+          h('div', { class: 'ow-sub' }, 비율막대, 비율글),
           끔('고정 샘플 크기'),
           칸('인스턴스 수:', 1),
           h('div', { class: 'ow-sub' }, h('label', { class: 'ow-radio off' }, h('input', { type: 'checkbox', disabled: true }), ' 복원 추출(중복 허용)')),
@@ -473,57 +578,66 @@ export default {
         묶음상자('옵션',
           h('label', { class: 'ow-radio' }, 고정상자, ' 재현 가능한(결정론적) 샘플링'),
           h('label', { class: 'ow-radio off' }, h('input', { type: 'checkbox', disabled: true }), ' 층화 샘플링 (가능한 경우)')),
-        h('button', { type: 'button', class: 'ow-btn wide', onclick: () => { if (!고정) { 씨앗 = Math.floor(Math.random() * 1e6); 그리기(); } else 그리기(); } }, '데이터 샘플링'),
+        h('button', { type: 'button', class: 'ow-btn wide', onclick: () => { if (!고정) 씨앗 = Math.floor(Math.random() * 1e6); 그리기(); } }, '데이터 샘플링'),
         h('div', { class: 'ow-foot' }, 줄수));
-      // 한국어판 오렌지의 모델 검증 및 평가 창 — 고를 수 있는 것은 평가 방법뿐이고, 딸린 칸은 화면 모양만 보여 준다
-      const 평가방법 = (글, i, 잠김 = false) => {
-        const 단추 = h('input', { type: 'radio', name: 'tas', checked: i === 0, disabled: 잠김 });
-        if (!잠김) 단추.addEventListener('change', () => { 시험방식 = i === 5 ? 1 : 0; 그리기(); });
-        return h('label', { class: `ow-radio${잠김 ? ' off' : ''}` }, 단추, ` ${글}`);
+      // 창 맨 아래 줄 수를 읽는다 — 전체 · 샘플 데이터 · 남은 데이터. 막대를 움직였으면 그 비율로 나뉜 수가 정답이다
+      const 행수들 = () => { const 나눔 = 훈련과시험(표.행, 고정씨앗, 비율 / 100).나눔; return [표.행.length, 나눔.훈련.length, 나눔.시험.length]; };
+      const 행수 = [['전체 데이터', '열 선택에서 들어온 데이터'], ['샘플 데이터 (Data Sample)', '모델이 배우는 데이터'], ['남은 데이터 (Remaining Data)', '모델을 시험하는 데이터']];
+      const 다함 = 끝났나('u4.split');
+      const 칸들 = 행수.map(([이름], i) => h('input', { type: 'text', class: 'blank', inputmode: 'numeric', size: 3, 'aria-label': `${이름} 행 수`, value: 다함 ? String(행수들()[i]) : '' }));
+      const 줄 = 알림줄();
+      const 확인 = () => {
+        let 맞음 = 0;
+        const 답 = 행수들();
+        칸들.forEach((inp, i) => { const ok = inp.value.trim() !== '' && Number(inp.value) === 답[i]; inp.classList.toggle('ok', ok); inp.classList.toggle('bad', !ok); if (ok) 맞음++; });
+        if (맞음 === 칸들.length) { 줄.맞음('맞았어요! 샘플 데이터는 **선형회귀** 로, 남은 데이터는 **예측 결과 보기** 로 보내요.'); 마침('u4.split'); }
+        else 줄.틀림('데이터 샘플링 창 맨 아래 **⇥ 들어온 수 ↦ 샘플 | 남은 수** 를 읽어 보세요.');
       };
-      const 고름 = (글, 값) => h('div', { class: 'ow-sub' }, 글, h('select', { class: 'ow-combo', disabled: true, 'aria-label': 글 }, h('option', {}, 값)));
-      const 상자 = (글, 켬) => h('div', { class: 'ow-sub' }, h('label', { class: 'ow-check' }, h('input', { type: 'checkbox', checked: 켬, disabled: true }), ` ${글}`));
-      const 평가창 = 위젯창({ 이름: 'Test and Score', 제목: '모델 검증 및 평가 (Test and Score)', 작게: true },
-        h('div', { class: 'ow-radios' },
-          평가방법('교차 검증 (Cross validation)', 0),
-          고름('폴드 수: (Number of folds:)', '5'),
-          상자('클래스 비율 유지', false),
-          평가방법('feature 기준 교차 검증', 1, true),
-          h('div', { class: 'ow-sub' }, h('select', { class: 'ow-combo full', disabled: true, 'aria-label': 'feature 기준 교차 검증에 쓸 속성' }, h('option', {}, ''))),
-          평가방법('무작위 샘플링 (Random sampling)', 2),
-          고름('반복 횟수: (Repeat train/test:)', '10'),
-          고름('학습 데이터 비율: (Training set size:)', '66 %'),
-          상자('클래스 비율 유지', true),
-          평가방법('LOOCV (하나 빼고 검증) (Leave one out)', 3),
-          평가방법('학습 데이터로 직접 평가 (Test on train data)', 4),
-          평가방법('별도 테스트 데이터로 평가 (Test on test data)', 5)),
-        결과);
+      if (다함) 줄.맞음('샘플 데이터는 **선형회귀** 로, 남은 데이터는 **예측 결과 보기** 로 보내요.');
       채우기(몸, h('div', { class: 'ds-grid' },
-        h('div', {}, 그림,
-          h('p', { class: 'small muted' }, md(`나온 회귀식: 비만율 = ${수(훈련과시험(표.행, 고정씨앗).모델.기울기, 2)} × 수면 시간 + ${수(훈련과시험(표.행, 고정씨앗).모델.절편, 2)} (고정 표본일 때)`)),
-          // 모델 검증 및 평가 창이 키가 커서(평가 방법 6가지 + 딸린 칸) 선 잇는 안내는 왼쪽 칸에 둔다
-          h('p', { class: 'small muted' }, md('Data Sampler → Test and Score 선을 두 번 눌러 **Data Sample → Data**, **Remaining Data → Test Data** 로 이어야 시험 데이터로 평가돼요.'))),
+        h('div', {},
+          h('div', { class: 'concept' }, md('**② 기계학습 기반 회귀 분석** 은 데이터를 **나눠** 배우고 시험해요. **홀드아웃(hold-out)** — 데이터 일부를 처음부터 **떼어 두고(hold out)** 학습에는 쓰지 않았다가, 모델을 다 만든 뒤 그 데이터로 시험을 보는 방법이에요.')),
+          h('div', { class: 'tip' }, md('🧸 **쉽게 말하면** — 문제집으로 공부하고, 선생님이 숨겨 둔 문제로 시험 보기.')),
+          그림),
         샘플링창,
-        평가창));
+        h('div', {},
+          h('p', { class: 'write-label' }, md('**(1)** 데이터 샘플링 창 아래에 나온 **행 수** 를 적어 보세요.')),
+          h('table', { class: 'kv small calc' },
+            h('tbody', {}, 행수.map(([이름, 뜻], i) => h('tr', {}, h('td', {}, h('b', {}, 이름), h('br'), h('small', { class: 'muted' }, 뜻)), h('td', { class: 'num' }, 칸들[i]))))),
+          h('div', { class: 'row check' }, h('button', { type: 'button', class: 'btn primary', onclick: 확인 }, '정답 확인'), 줄),
+          위젯연결도([
+            { id: 'ds', 위젯: 'Data Sampler', 이름줄: ['데이터 샘플링'], x: 55, y: 98 },
+            { id: 'lr', 위젯: 'Linear Regression', 이름줄: ['선형회귀'], x: 180, y: 36 },
+            { id: 'pr', 위젯: 'Predictions', 이름줄: ['예측 결과 보기'], x: 290, y: 126 },
+          ], [
+            { 부터: 'ds', 까지: 'lr', 글: '샘플 데이터' },
+            { 부터: 'ds', 까지: 'pr', 글: '남은 데이터' },
+            { 부터: 'lr', 까지: 'pr', 글: '모델' },
+          ], { 너비: 336, 높이: 186, 키: 150 }),
+          비율알림)));
     }, '교재 23쪽'),
 
-    // ② 기계학습 흐름의 평가 — 예측 결과 보기(Predictions) 창을 읽는다. 오차를 직접 셈해야 창의 error 열이 열린다
-    카드('예측 결과 보기로 시험 데이터 평가하기', '오렌지', (몸) => {
+    // ② 기계학습 흐름의 평가 — 예측 결과 보기(Predictions) 창을 읽는다. 학생 학습지(PDF) 의 두 문항을 그대로 중심에 둔다(2026-11-08 사용자 지시):
+    //  (1) 창에 나온 시험 데이터 위에서부터 세 줄을 옮겨 적고 오차를 구한다 — 다 맞히면 창의 error 열이 열린다
+    //  (2) 창 아래 성능 점수(평가 지표)를 적는다 — 성능 점수 표시는 처음부터 켜 둔다
+    // Test and Score 와 견주는 문항·MAPE 뜻을 묻는 문항은 사용자 지시로 뺐다.
+    카드('② 기계학습 기반 회귀 분석 (2) — 예측 결과 보기로 평가하기', '오렌지', (몸) => {
       const 표 = 수면비만();
       const { 줄들, 점수 } = 시험예측(표.행);
       const 한자리 = (v) => 수(v, 1);
       const 셈할줄 = 줄들.slice(0, 3);
       let 풀림 = 끝났나('u4.pred-error');
       const 창표 = h('div', {}), 점수칸 = h('div', {});
-      const 점수상자 = h('input', { type: 'checkbox' });
+      const 점수상자 = h('input', { type: 'checkbox', checked: true });
       const 창그리기 = () => 채우기(창표, 데이터표(['선형회귀', 'error', 비만열, 수면열, '시점'],
         줄들.map((r) => [한자리(r.p), 풀림 ? 한자리(r.e) : null, 한자리(r.y), 수(r.x, 2), r.시점]),
-        { 대상: [2], 메타: [4], 설명: `시험 데이터(남은 데이터) ${줄들.length}줄${풀림 ? '' : ' · error 는 직접 셈하면 열려요'}` }));
+        { 대상: [2], 메타: [4], 설명: `시험 데이터(남은 데이터) ${줄들.length}줄${풀림 ? '' : ' · error 는 (1) 을 풀면 열려요'}` }));
+      const 지표 = [['MSE', '평균제곱오차'], ['RMSE', '평균제곱근오차'], ['MAE', '평균절대오차'], ['MAPE', '평균절대백분율오차'], ['sMAPE', '대칭 평균절대백분율오차'], ['R2', '결정 계수']];
       const 점수그리기 = () => 채우기(점수칸, 점수상자.checked ? h('div', { class: 'ow-table-wrap' }, h('table', { class: 'ow-table score' },
-        h('thead', {}, h('tr', {}, ['Model', 'MSE', 'RMSE', 'MAE', 'MAPE', 'sMAPE', 'R2'].map((t) => h('th', {}, t)))),
-        h('tbody', {}, h('tr', {}, h('td', {}, '선형회귀'), [점수.MSE, 점수.RMSE, 점수.MAE, 점수.MAPE, 점수.sMAPE, 점수.R2].map((v) => h('td', {}, 수(v, 3))))))) : null);
+        h('thead', {}, h('tr', {}, h('th', {}, 'Model'), 지표.map(([k]) => h('th', {}, k)))),
+        h('tbody', {}, h('tr', {}, h('td', {}, '선형회귀'), 지표.map(([k]) => h('td', {}, 수(점수[k], 3))))))) : null);
       점수상자.addEventListener('change', 점수그리기);
-      창그리기();
+      창그리기(); 점수그리기();
       const 예측창 = 위젯창({ 이름: 'Predictions', 제목: '예측 결과 보기 (Predictions)', 작게: true },
         h('div', { class: 'ow-line' }, '표시할 회귀 오류:',
           h('select', { class: 'ow-combo', disabled: true, 'aria-label': '표시할 회귀 오류' }, h('option', {}, '차이 (예측값 - 실제값)')),
@@ -531,69 +645,109 @@ export default {
         창표,
         h('label', { class: 'ow-check ow-line' }, 점수상자, ' 성능 점수 표시'),
         점수칸);
-      // 위에서부터 세 줄의 오차를 셈한다 — 창에 보이는 한 자리 값으로 셈해도, 끝자리까지 셈해도 맞게 받는다
-      const 칸들 = 셈할줄.map((r, i) => h('input', { type: 'text', class: 'blank', inputmode: 'decimal', size: 5, 'aria-label': `${i + 1}번 줄 오차`, value: 풀림 ? 한자리(r.e) : '' }));
+      const 입력 = (이름, 값) => h('input', { type: 'text', class: 'blank', inputmode: 'decimal', size: 4, 'aria-label': 이름, value: 값 ?? '' });
+      // Number('') 은 0 이라 빈칸을 먼저 거른다
+      const 숫자 = (inp) => { const 글 = inp.value.trim().replace(/[−–]/g, '-'); return 글 === '' ? NaN : Number(글); };
+      const 표시 = (inp, ok) => { inp.classList.toggle('ok', ok); inp.classList.toggle('bad', !ok); };
+
+      // (1) 위에서부터 세 줄 — 독립 변수 값 · 실제 값 · 예측값 · 오차. 창에 보이는 한 자리 값으로 셈해도, 끝자리까지 셈해도 맞게 받는다
+      const 줄칸들 = 셈할줄.map((r, i) => ({ x: 입력(`${i + 1}번 독립 변수 값`, 풀림 ? 수(r.x, 2) : ''), y: 입력(`${i + 1}번 실제 값`, 풀림 ? 한자리(r.y) : ''),
+        p: 입력(`${i + 1}번 예측값`, 풀림 ? 한자리(r.p) : ''), e: 입력(`${i + 1}번 오차`, 풀림 ? 한자리(r.e) : '') }));
       const 셈줄 = 알림줄();
-      const 확인 = () => {
-        let 맞음 = 0, 뒤집힘 = 0;
-        칸들.forEach((inp, i) => {
-          const r = 셈할줄[i], 글 = inp.value.trim().replace(/[−–]/g, '-'), v = Number(글);
-          const 보인차 = Number(한자리(r.p)) - r.y;
-          // 부호 1 은 바른 답, −1 은 실제값 − 예측값 으로 거꾸로 뺀 답. Number('') 은 0 이라 빈칸을 먼저 거른다
-          const 가깝다 = (부호) => 글 !== '' && Number.isFinite(v) && (Math.abs(v - 부호 * r.e) <= 0.06 || Math.abs(v - 부호 * 보인차) <= 0.001);
-          const ok = 가깝다(1), 반대 = !ok && 가깝다(-1);
-          inp.classList.toggle('ok', ok); inp.classList.toggle('bad', !ok);
-          if (ok) 맞음++;
-          if (반대) 뒤집힘++;
+      const 확인1 = () => {
+        let 맞음 = 0, 뒤집힘 = false;
+        셈할줄.forEach((r, i) => {
+          const c = 줄칸들[i], 보인차 = Number(한자리(r.p)) - r.y, e = 숫자(c.e);
+          // 부호 1 은 바른 답, −1 은 실제값 − 예측값 으로 거꾸로 뺀 답
+          const 오차맞나 = (부호) => Number.isFinite(e) && (Math.abs(e - 부호 * r.e) <= 0.06 || Math.abs(e - 부호 * 보인차) <= 0.001);
+          const 판정 = [[c.x, Math.abs(숫자(c.x) - r.x) <= 0.006], [c.y, Math.abs(숫자(c.y) - r.y) <= 0.051], [c.p, Math.abs(숫자(c.p) - r.p) <= 0.06], [c.e, 오차맞나(1)]];
+          판정.forEach(([inp, ok]) => { 표시(inp, ok); if (ok) 맞음++; });
+          if (!오차맞나(1) && 오차맞나(-1)) 뒤집힘 = true;
         });
-        if (맞음 === 칸들.length) { 풀림 = true; 마침('u4.pred-error'); 창그리기(); 셈줄.맞음('모두 맞았어요! 창의 **error** 열이 열렸어요.'); }
-        else if (뒤집힘) 셈줄.틀림('부호가 반대인 칸이 있어요. 오렌지의 error 는 **예측값 − 실제값** 이에요.');
-        else 셈줄.틀림(`${칸들.length}칸 중 ${맞음}칸 맞았어요. 예측값(선형회귀 열)에서 실제 값(${비만열})을 빼 보세요.`);
+        if (맞음 === 셈할줄.length * 4) { 풀림 = true; 마침('u4.pred-error'); 창그리기(); 셈줄.맞음('모두 맞았어요! 창의 **error** 열이 열렸어요. 음수면 실제보다 **낮게**, 양수면 **높게** 예측한 거예요.'); }
+        else if (뒤집힘) 셈줄.틀림('오차의 부호가 반대인 칸이 있어요. 오렌지의 error 는 **예측값 − 실제값** 이에요.');
+        else 셈줄.틀림(`${셈할줄.length * 4}칸 중 ${맞음}칸 맞았어요. 독립 변수는 **${수면열}**, 실제 값은 **${비만열}**, 예측값은 **선형회귀** 열이에요.`);
       };
-      if (풀림) 셈줄.맞음('셈한 오차가 창의 **error** 열과 같아요.');
-      채우기(몸, h('div', { class: 'two' },
+      if (풀림) 셈줄.맞음('창의 **error** 열과 같아요. 음수면 실제보다 낮게, 양수면 높게 예측한 거예요.');
+
+      // (2) 창 아래 성능 점수 — 세 자리로 적어도, 두 자리로 줄여 적어도 받는다
+      const 점수됨 = 끝났나('u4.pred-score');
+      const 점수칸들 = 지표.map(([k]) => 입력(`${k} 값`, 점수됨 ? 수(점수[k], 3) : ''));
+      const 점수줄 = 알림줄();
+      const 확인2 = () => {
+        let 맞음 = 0;
+        점수칸들.forEach((inp, j) => { const ok = Math.abs(숫자(inp) - 점수[지표[j][0]]) <= 0.006; 표시(inp, ok); if (ok) 맞음++; });
+        if (맞음 === 지표.length) { 점수줄.맞음(`맞았어요! 모두 학습에 쓰지 않은 **남은 데이터 ${줄들.length}줄** 로 낸 점수예요.`); 마침('u4.pred-score'); }
+        else 점수줄.틀림(`${지표.length}칸 중 ${맞음}칸 맞았어요. 창 아래 **성능 점수** 줄에서 옮겨 적어요.`);
+      };
+      if (점수됨) 점수줄.맞음(`학습에 쓰지 않은 **남은 데이터 ${줄들.length}줄** 로 낸 점수예요.`);
+
+      채우기(몸, h('div', { class: 'two pred-card' },
         h('div', {},
-          h('p', { class: 'small' }, md('② 기계학습 흐름처럼 **선형회귀(샘플 데이터로 학습)** 의 모델과 **남은 데이터** 를 **예측 결과 보기** 에 이으면, 학습에 쓰지 않은 시험 데이터의 예측값이 나와요.')),
+          h('p', { class: 'small' }, md('② 흐름처럼 **선형회귀** 의 모델과 **남은 데이터** 를 **예측 결과 보기** 에 이으면, 학습에 쓰지 않은 시험 데이터를 예측하고 성능을 확인할 수 있어요.')),
           예측창,
           h('p', { class: 'small muted fig-cap' }, md('왼쪽 두 열이 모델이 낸 값, 그 오른쪽이 시험 데이터예요. **error = 예측값 − 실제값**'))),
         h('div', {},
-          h('p', { class: 'write-label' }, md('**(1)** 위에서부터 세 줄의 **오차(예측값 − 실제값)** 를 셈해 보세요.')),
-          h('table', { class: 'kv small calc' },
-            h('thead', {}, h('tr', {}, ['', '시점', '예측값', '실제 값', '오차'].map((t) => h('th', { class: t && t !== '시점' ? 'num' : '' }, t)))),
-            h('tbody', {}, 셈할줄.map((r, i) => h('tr', {}, h('td', {}, i + 1), h('td', {}, r.시점), h('td', { class: 'num' }, 한자리(r.p)), h('td', { class: 'num' }, 한자리(r.y)), h('td', { class: 'num' }, 칸들[i]))))),
-          h('div', { class: 'row check' }, h('button', { type: 'button', class: 'btn primary', onclick: 확인 }, '정답 확인'), 셈줄),
-          퀴즈([
-            // 보기를 짧게(16자 안) 두어 한 줄 세 칸으로 놓이게 한다 — 길면 세로로 쌓여 1280×720 을 넘친다
-            { 질문: 'error 가 **음수(−)** 인 줄은 무엇을 뜻할까요?', 보기: ['실제보다 **낮게** 예측', '실제보다 **높게** 예측', '데이터가 잘못 들어감'], 답: 0,
-              해설: 'error = 예측값 − 실제값 이니, 음수면 예측값이 실제 값보다 작아요.' },
-            { 질문: '**성능 점수 표시** 를 켜고, MSE·RMSE·MAE·R2 를 10번 카드(별도 테스트 데이터로 평가)의 점수와 견주면?', 보기: ['똑같다', '예측 결과 보기가 높다', '서로 관계없다'], 답: 0,
-              해설: '같은 모델로 **같은 시험 데이터** 를 셈했으니 같아요.', 힌트: '창 아래 「성능 점수 표시」 를 켜고 10번 카드의 점수와 견주어 보세요.' },
-            { 질문: `성능 점수의 MAPE ${수(점수.MAPE, 1)} 은 무슨 뜻일까요?`, 보기: [`평균 ${수(점수.MAPE, 1)} % 쯤 어긋났다`, `${수(점수.MAPE, 1)} % 를 맞혔다`, `결정 계수가 ${수(점수.MAPE / 100, 3)}`], 답: 0,
-              해설: 'MAPE 는 오차를 **실제 값으로 나눈 비율(%)** 의 평균이에요(sMAPE 는 실제 값과 예측값의 평균으로 나눠요).' },
-          ], { 열쇠: 'u4.pred-q' }))));
+          h('p', { class: 'write-label' }, md('**(1)** 창에 나온 시험 데이터 가운데 **위에서부터 3줄** 을 옮겨 적고, **오차** 를 구해 보세요.')),
+          h('table', { class: 'kv small calc pdf-table' },
+            h('thead', {}, h('tr', {}, h('th', {}, '번호'), [['독립 변수 값', ''], ['실제 값', '종속 변수'], ['예측값', '선형회귀'], ['오차', '예측값 − 실제 값']].map(([a, b]) => h('th', { class: 'center' }, a, b ? [h('br'), h('small', { class: 'muted' }, b)] : null)))),
+            h('tbody', {}, 줄칸들.map((c, i) => h('tr', {}, h('td', { class: 'center' }, i + 1), [c.x, c.y, c.p, c.e].map((inp) => h('td', { class: 'center' }, inp)))))),
+          h('div', { class: 'row check' }, h('button', { type: 'button', class: 'btn primary', onclick: 확인1 }, '정답 확인'), 셈줄),
+          h('p', { class: 'write-label' }, md('**(2)** 창 아래쪽에 나온 **평가 지표** 를 적어 보세요.')),
+          h('table', { class: 'kv small calc pdf-table' },
+            h('thead', {}, h('tr', {}, 지표.map(([k, 이름]) => h('th', { class: 'center' }, k === 'R2' ? 'R²' : k, h('br'), h('small', { class: 'muted' }, 이름))))),
+            h('tbody', {}, h('tr', {}, 점수칸들.map((inp) => h('td', { class: 'center' }, inp))))),
+          h('div', { class: 'row check' }, h('button', { type: 'button', class: 'btn primary', onclick: 확인2 }, '정답 확인'), 점수줄))));
     }, '교재 23쪽'),
 
-    카드('표본이 바뀌면 결정계수도 바뀔까?', '활동', (몸) => {
+    // Test and Score 로 하는 ② 기계학습 기반 회귀 분석 — 「별도 테스트 데이터로 평가」 를 고르면 되지만 선 연결을 바꿔야 한다(2026-11-08 사용자 지시).
+    //   데이터 샘플링 → 모델 검증 및 평가 선을 두 번 눌러 샘플 데이터 → 데이터, 남은 데이터 → 테스트 데이터 로 잇는다. 점수는 12번 카드(예측 결과 보기)와 같다.
+    //   ⚠ 「테스트 데이터 (Test Data)」 의 한국어 글자는 한국어판 화면으로 확인하지 못했다(평가 방법 이름 「별도 테스트 데이터로 평가」 에 맞춰 적었다).
+    카드('Test and Score 로 ② 하기 — 선 바꿔 잇기', '오렌지', (몸) => {
       const 표 = 수면비만();
-      const 기록 = [];
-      const 목록 = h('div', {});
-      const 그리기 = () => 채우기(목록,
-        h('div', { class: 'r2-bars' }, 기록.map((v, i) => h('div', { class: 'r2-bar', title: `${i + 1}번째: R² ${수(v, 3)}` }, h('span', { style: { height: `${Math.max(2, v * 100)}%` } }), h('small', {}, 수(v, 2))))),
-        기록.length ? h('p', {}, md(`${기록.length}번 뽑음 · R² 가장 낮음 **${수(Math.min(...기록), 2)}**, 가장 높음 **${수(Math.max(...기록), 2)}**`)) : h('p', { class: 'muted' }, '단추를 여러 번 눌러 보세요.'));
-      const 뽑기 = () => { 기록.push(훈련과시험(표.행, Math.floor(Math.random() * 1e6)).점수.R2); if (기록.length > 14) 기록.shift(); 그리기(); if (기록.length >= 5) 마침('u4.resample'); };
-      그리기();
+      const 점수 = 평가방법점수(표.행, 'test');
+      let 이음 = 끝났나('u4.tas-link');
+      const 그림자리 = h('div', {}), 결과 = h('div', {}), 줄 = 알림줄();
+      const 그림그리기 = () => 채우기(그림자리, 위젯연결도([
+        { id: 'ds', 위젯: 'Data Sampler', 이름줄: ['데이터 샘플링'], x: 60, y: 52 },
+        { id: 'lr', 위젯: 'Linear Regression', 이름줄: ['선형회귀'], x: 60, y: 150 },
+        { id: 'ts', 위젯: 'Test and Score', 이름줄: ['모델 검증 및 평가', '(Test and Score)'], x: 400, y: 100 },
+      ], [
+        { 부터: 'ds', 까지: 'ts', 글: 이음 ? ['샘플 데이터 → 데이터 (Data)', '남은 데이터 → 테스트 데이터 (Test Data)'] : ['샘플 데이터 → 데이터 (Data)', '남은 데이터 → ?'] },
+        { 부터: 'lr', 까지: 'ts', 글: '학습 알고리즘 (Learner)' },
+      ], { 너비: 470, 높이: 210, 키: 160 }));
+      그림그리기();
+      const 바뀜 = (m) => {
+        채우기(결과);
+        if (m === 'test') {
+          if (!이음) { 줄.틀림('먼저 왼쪽에서 선 연결을 바꿔요. **테스트 데이터** 가 이어져 있지 않으면 오렌지도 점수를 내지 못해요.'); return; }
+          채우기(결과, 점수표(점수));
+          줄.맞음(`**12번 카드의 예측 결과 보기** 성능 점수와 같아요(R² ${수(점수.R2, 3)}). 같은 모델로 같은 **남은 데이터 ${훈련과시험(표.행, 고정씨앗).나눔.시험.length}개** 를 쟀으니까요.`);
+          마침('u4.tas-test');
+        } else if (m === 'train') 줄.틀림('학습 데이터로 직접 평가는 모델이 **배운 샘플 데이터** 로 다시 재요. 떼어 둔 남은 데이터로 재려면 **별도 테스트 데이터로 평가** 를 골라요.');
+        else if (m === 'cv' || m === 'loo') 줄.틀림('교차 검증은 맨 끝 **⭐ 심화 카드** 에서 다뤄요.');
+        else 줄.틀림('무작위 샘플링은 이 단원에서 다루지 않아요.');
+      };
+      // 선 연결 바꾸기 — 짝짓기가 끝나면(단추 누름이 이 상자까지 올라온다) 그림의 선 글을 채운다
+      const 잇기 = h('div', { onclick: () => { if (!이음 && 끝났나('u4.tas-link')) { 이음 = true; 그림그리기(); } } },
+        짝짓기([
+          { 왼: '샘플 데이터 (Data Sample) →', 답: '데이터 (Data)' },
+          { 왼: '남은 데이터 (Remaining Data) →', 답: '테스트 데이터 (Test Data)' },
+        ], ['데이터 (Data)', '테스트 데이터 (Test Data)', '학습 알고리즘 (Learner)'], { 열쇠: 'u4.tas-link', 왼제목: '데이터 샘플링의 출력', 오른제목: '모델 검증 및 평가의 입력' }));
+      if (끝났나('u4.tas-test')) 채우기(결과, 점수표(점수));
       채우기(몸, h('div', { class: 'two' },
         h('div', {},
-          h('p', {}, md('데이터 샘플링 창에서 **재현 가능한(결정론적) 샘플링** 을 끄고 **데이터 샘플링** 단추를 여러 번 누르면 훈련·시험 데이터가 매번 다르게 뽑혀요. 그때마다 R² 는 어떻게 될까요?')),
-          h('div', { class: 'row' }, h('button', { type: 'button', class: 'btn primary', onclick: 뽑기 }, '🎲 다시 뽑기'), h('button', { type: 'button', class: 'btn small', onclick: () => { for (let i = 0; i < 5; i++) 뽑기(); } }, '다섯 번 뽑기')),
-          목록),
+          h('p', { class: 'small' }, md('② 는 **모델 검증 및 평가 (Test and Score)** 로도 할 수 있어요. 창에서 **별도 테스트 데이터로 평가** 를 고르면 되지만, 그 전에 **선 연결을 바꿔야** 해요. 오렌지에서 데이터 샘플링과 모델 검증 및 평가 사이의 **선을 두 번 눌러** 연결 창을 열고 고쳐요.')),
+          그림자리,
+          잇기),
         h('div', {},
-          h('div', { class: 'concept' }, md('데이터가 **17개뿐** 이라 시험 데이터는 5개예요. 어떤 5개가 뽑히느냐에 따라 R² 가 크게 달라져요.')),
-          교재메모('교재는 결정계수 **0.89** 를 얻었다고 해요. 교재도 「연결선에 따라 결정계수 값이 다르게 나올 수 있다」고 적어 두었어요. 내 결과가 교재와 다르다고 틀린 것이 아니에요.'),
-          퀴즈([{ 질문: '결과를 믿을 만하게 하려면?', 보기: ['R² 가 가장 높게 나온 한 번만 발표한다', '여러 번 해 보거나 데이터를 더 모은다'], 답: 1, 해설: '좋은 결과만 골라 보이는 것은 데이터를 속이는 일이에요.' }], { 열쇠: 'u4.resample-q' }))));
+          평가창({ 이름: 'tas-ml', 바뀜, 간단: true }, 결과),
+          줄)));
     }, '교재 23쪽'),
 
-    카드('홀드아웃 — 시험 문제를 따로 떼어 두기', '개념', (몸) => {
+    // 홀드아웃 점수는 얼마나 흔들릴까 — 예전의 「표본이 바뀌면 결정계수도 바뀔까?」 와 홀드아웃 카드의 100번 나눠 보기를 합쳤다
+    //   (홀드아웃 개념은 11번 카드로 옮겼다)
+    카드('홀드아웃 점수는 얼마나 흔들릴까?', '활동', (몸) => {
       const 표 = 수면비만();
       const { 나눔, 점수 } = 훈련과시험(표.행, 고정씨앗);
       const 띠 = h('div', { class: 'yr-strip' }, 표.행.map((r, i) => h('span', { class: 'yr', style: { background: 나눔.시험.includes(i) ? 시험색 : 학습색 } }, String(r.시점))));
@@ -601,108 +755,28 @@ export default {
       const 요약 = h('p', { class: 'small' });
       let 몇번 = 0;
       const 나눠보기 = () => {
-        // 처음 100번은 늘 씨앗 1~100 — 다음 카드(교차 검증)가 이 100번과 견준다
+        // 처음 100번은 늘 씨앗 1~100 — 맨 끝 심화 카드(교차 검증)가 이 100번과 견준다
         const 시작 = 몇번 === 0 ? 1 : 1000 + Math.floor(Math.random() * 1e6);
         const 값들 = 홀드아웃여러번(표.행, Array.from({ length: 100 }, (_, i) => 시작 + i));
         몇번++;
         const 줄 = [...값들].sort((a, b) => a - b), 가운데 = (줄[49] + 줄[50]) / 2, 음수 = 줄.filter((v) => v < 0).length;
-        채우기(그림, 점분포(값들, [{ 값: 가운데, 글: `가운데 ${수(가운데, 2)}`, 색: '#555', 쪽: 'end' }, { 값: 점수.R2, 글: `단계 5 (${수(점수.R2, 2)})`, 색: 시험색 }]));
+        채우기(그림, 점분포(값들, [{ 값: 가운데, 글: `가운데 ${수(가운데, 2)}`, 색: '#555', 쪽: 'end' }, { 값: 점수.R2, 글: `12번 카드 (${수(점수.R2, 2)})`, 색: 시험색 }]));
         채우기(요약, md(`100번 나눠 본 R² — 가장 낮음 **${수(줄[0], 2)}** · 가운데 **${수(가운데, 2)}** · 가장 높음 **${수(줄[99], 2)}**. 0.5 아래로 떨어진 것이 **${줄.filter((v) => v < 0.5).length}번**이에요.`
           + (음수 ? ` 빨간 점(${음수}번)은 R² 가 0 보다 작은 것 — 시험 데이터를 평균 하나로 찍는 것보다도 못 맞혔다는 뜻이에요.` : '')));
         마침('u4.holdout');
       };
       채우기(몸, h('div', { class: 'two' },
         h('div', {},
-          h('div', { class: 'concept' }, md('**홀드아웃(hold-out)** 은 데이터 일부를 처음부터 **떼어 두고(hold out)** 학습에는 쓰지 않았다가, 모델을 다 만든 뒤 그 떼어 둔 데이터로 시험을 보는 평가 방법이에요.')),
-          h('p', {}, md('**10번 카드(단계 5)** 에서 한 것이 바로 홀드아웃이에요. Data Sampler 가 떼어 둔 30 % 로 **「별도 테스트 데이터로 평가」** 를 했지요.')),
+          h('p', {}, md('데이터 샘플링 창에서 **재현 가능한(결정론적) 샘플링** 을 끄고 다시 뽑으면 **남은 데이터 5개** 가 매번 바뀌어요. 11·12번 카드의 홀드아웃을 **100번** 해 보면 R² 는 얼마나 흔들릴까요?')),
           띠,
-          h('div', { class: 'legend' }, h('span', { style: { '--c': 학습색 } }, `학습 ${나눔.훈련.length}개 (70 %)`), h('span', { style: { '--c': 시험색 } }, `시험 ${나눔.시험.length}개 (30 %, 떼어 둔 것)`)),
-          h('div', { class: 'tip' }, md('🧸 **쉽게 말하면** — 문제집으로 공부하고, 선생님이 숨겨 둔 문제로 시험 보기. 문제집 문제를 그대로 내면 아는 것인지 외운 것인지 알 수 없으니까요.')),
-          퀴즈([{ 질문: '10번 카드의 「모델 검증 및 평가」 창에서 홀드아웃은 어느 것이었나요?', 보기: ['교차 검증', '학습 데이터로 직접 평가', '별도 테스트 데이터로 평가'], 답: 2,
-            해설: '학습에 쓰지 않고 떼어 둔 데이터(Test Data)로 평가하는 것이 홀드아웃이에요. 「학습 데이터로 직접 평가」 는 배운 문제로 다시 시험을 보는 것이에요.' }], { 열쇠: 'u4.holdout-q' })),
-        h('div', {},
-          h('p', {}, md('그런데 **딱 한 번** 나누면, 어떤 5개가 시험으로 뽑히느냐에 따라 점수가 달라져요(12번 카드). 100번 나눠 보면 얼마나 흔들릴까요?')),
+          h('div', { class: 'legend' }, h('span', { style: { '--c': 학습색 } }, `샘플 ${나눔.훈련.length}개`), h('span', { style: { '--c': 시험색 } }, `남은 ${나눔.시험.length}개 (11번 카드의 고정 표본)`)),
           h('button', { type: 'button', class: 'btn primary', onclick: 나눠보기 }, '🎲 100번 나눠 보기'),
-          그림, 요약,
-          h('div', { class: 'concept' }, md('데이터가 적으면 홀드아웃 점수 **하나만으로는** 모델을 믿기 어려워요. 시험을 한 번만 보지 말고 **돌아가며 여러 번** 보면 어떨까요? → 다음 카드 **교차 검증**')))));
-    }, '교재 23쪽'),
-
-    카드('교차 검증 — 돌아가며 시험 보기', '활동', (몸) => {
-      const 표 = 수면비만();
-      const n = 표.행.length;
-      const 해 = 표.행.map((r) => `'${String(r.시점).slice(-2)}`);
-      const 홀드 = 홀드아웃여러번(표.행, Array.from({ length: 100 }, (_, i) => i + 1)).sort((a, b) => a - b);
-      let k = 5, 씨앗 = 1, 끝낸 = 0, 기록됨 = false;
-      let cv = 교차검증(표.행, k, 씨앗);
-      const 기록 = [];   // 지금 폴드 수로 끝까지 돌려 본 R² — 다시 섞을 때마다 하나씩 는다
-      const 격자 = h('div', {}), 알림 = h('p', { class: 'small cv-note' }), 결과 = h('div', { class: 'cv-result' });
-      const 이름 = () => (k === n ? 'LOOCV' : `${k}겹 교차 검증`);
-      function 그리기() {
-        채우기(격자, 교차격자(cv, 끝낸, 해));
-        const 판 = cv.판들[끝낸 - 1];
-        채우기(알림, 끝낸 === 0 ? md('**▶ 한 판씩** 을 눌러 보세요. 한 줄이 한 판이고, **주황 칸** 이 그 판의 시험 데이터예요.')
-          : 끝낸 < k ? md(`**${끝낸}판** — 시험: ${판.시험.map((i) => 해[i]).join(' · ')} (${판.시험.length}개) · 학습: 나머지 ${판.학습.length}개`)
-            : md(`**${k}판 모두 끝!** 모델을 ${k}번 만들었고, ${n}개 데이터가 **꼭 한 번씩** 시험을 봤어요.`));
-        const 센 = cv.판들.slice(0, 끝낸).reduce((a, p) => a + p.시험.length, 0);
-        채우기(결과,
-          끝낸 < k ? h('p', { class: 'muted' }, `${끝낸} / ${k}판 · 예측한 데이터 ${센} / ${n}개`)
-            : [h('div', { class: 'big-num' }, `R² ${수(cv.점수.R2, 2)}`), h('p', { class: 'small' }, md(`판마다 나온 예측 ${n}개를 **모두 모아** 한 번에 낸 점수예요. 오렌지 Test and Score 도 이렇게 셈해요.`))],
-          h('table', { class: 'kv cv-cmp' }, h('tbody', {},
-            h('tr', {}, h('td', {}, '홀드아웃 100번 (13번 카드)'), h('td', { class: 'num' }, `${수(홀드[0], 2)} ~ ${수(홀드[99], 2)}`)),
-            h('tr', { class: 'hl' }, h('td', {}, `${이름()} · 섞어서 ${기록.length}번`),
-              h('td', { class: 'num' }, 기록.length ? `${수(Math.min(...기록), 2)} ~ ${수(Math.max(...기록), 2)}` : '끝까지 돌려 보세요')))),
-          기록.length >= 2 ? h('p', { class: 'small' }, md(k === n ? '**LOOCV 는 몇 번을 섞어도 같은 값** 이에요. 하나씩 빼고 모두 해 보니 나누는 데 운이 끼어들 자리가 없어요.'
-            : '여러 번 섞어도 **홀드아웃보다 훨씬 덜 흔들려요.** 모든 데이터가 한 번씩 시험을 보니 「운 좋은 5개」·「운 나쁜 5개」 가 섞여 고르게 되거든요.')) : null);
-      }
-      const 다시 = (새k, 새씨앗) => { k = 새k; 씨앗 = 새씨앗; cv = 교차검증(표.행, k, 씨앗); 끝낸 = 0; 기록됨 = false; 그리기(); };
-      const 다함 = () => { if (!기록됨) { 기록.push(cv.점수.R2); 기록됨 = true; 마침('u4.cv'); } };
-      const 한판 = () => { if (끝낸 < k) { 끝낸++; if (끝낸 === k) 다함(); 그리기(); } };
-      const 끝까지 = () => { 끝낸 = k; 다함(); 그리기(); };
-      // 10번 카드의 「모델 검증 및 평가」 창에서 교차 검증과 LOOCV 만 꺼내 왔다 — 폴드 수는 오렌지처럼 2·3·5·10·20
-      const 경고 = h('div', {});
-      const 폴드 = h('select', { class: 'ow-combo', 'aria-label': '폴드 수' }, [2, 3, 5, 10, 20].map((v) => h('option', { value: v, selected: v === 5 }, String(v))));
-      const 교차단추 = h('input', { type: 'radio', name: 'cvm', checked: true });
-      const 하나단추 = h('input', { type: 'radio', name: 'cvm' });
-      const 폴드로 = () => {
-        const v = Number(폴드.value);
-        채우기(경고, v > n ? h('p', { class: 'feedback bad' }, `데이터가 ${n}개뿐이라 ${v}묶음으로는 나눌 수 없어요. 오렌지도 이때는 오류를 알려요.`) : null);
-        if (v <= n) { 기록.length = 0; 다시(v, 1); }
-        else 폴드.value = String(k < n ? k : 5);   // 나눌 수 없는 값은 받지 않고, 지금 돌고 있는 폴드 수로 되돌린다
-      };
-      교차단추.addEventListener('change', 폴드로);
-      폴드.addEventListener('change', () => { 교차단추.checked = true; 폴드로(); });
-      하나단추.addEventListener('change', () => { 채우기(경고); 기록.length = 0; 다시(n, 1); });
-      const 평가창 = 위젯창({ 이름: 'Test and Score', 제목: '모델 검증 및 평가 (Test and Score)', 작게: true },
-        h('div', { class: 'ow-radios' },
-          h('label', { class: 'ow-radio' }, 교차단추, ' 교차 검증 (Cross validation)'),
-          h('div', { class: 'ow-sub' }, '폴드 수: (Number of folds:)', 폴드),
-          h('label', { class: 'ow-radio' }, 하나단추, ' LOOCV (하나 빼고 검증) (Leave one out)')));
-      그리기();
-      채우기(몸, h('div', { class: 'two wide-left' },
+          그림, 요약),
         h('div', {},
-          h('div', { class: 'concept' }, md('**k-겹 교차 검증(k-fold cross validation)** — 데이터를 **k 묶음(폴드)** 으로 나누고, 한 묶음씩 **돌아가며** 시험으로 써요. 나머지 묶음으로 학습하니 모델을 k 번 만들고, 모든 데이터가 꼭 한 번씩 시험을 봐요.')),
-          격자,
-          h('div', { class: 'row' },
-            h('button', { type: 'button', class: 'btn primary', onclick: 한판 }, '▶ 한 판씩'),
-            h('button', { type: 'button', class: 'btn', onclick: 끝까지 }, '⏩ 끝까지'),
-            h('button', { type: 'button', class: 'btn small', onclick: () => 다시(k, 2 + Math.floor(Math.random() * 1e6)) }, '🔀 다시 섞기')),
-          알림),
-        h('div', {},
-          h('p', { class: 'small' }, md('**10번 카드** 의 「모델 검증 및 평가」 창 맨 위에 있던 **교차 검증** 이 바로 이것이에요. 폴드 수를 바꿔 보세요.')),
-          평가창, 경고, 결과,
-          h('div', { class: 'row' },
-            h('button', { type: 'button', class: 'btn small', onclick: 여섯가지 }, '📋 창의 평가 방법 여섯 가지'),
-            h('a', { class: 'btn small', href: '#u4/9' }, '↩ 10번 카드 창 다시 보기')))));
-      // 여섯 가지 풀이는 카드에 펼치면 1280×720 을 넘쳐서 창으로 띄운다
-      function 여섯가지() {
-        창('📋 「모델 검증 및 평가」 창의 평가 방법 여섯 가지', h('ul', { class: 'cv-map' },
-              h('li', {}, md('**교차 검증** — 이 카드. 폴드 수만큼 판을 돌려요.')),
-              h('li', {}, md('**feature 기준 교차 검증** — 범주형 속성의 값마다 묶음을 나눠요. 이 데이터에는 범주형 속성이 없어 흐리게 보여요.')),
-              h('li', {}, md('**무작위 샘플링** — 홀드아웃을 여러 번(반복 횟수 10 · 학습 66 %) 하고 점수를 모아요.')),
-              h('li', {}, md('**LOOCV (하나 빼고 검증)** — 폴드 수를 데이터 수만큼. 하나씩 빼고 17번 해요.')),
-              h('li', {}, md('**학습 데이터로 직접 평가** — 배운 데이터로 다시 시험. 처음 보는 데이터에서의 실력은 알 수 없어요.')),
-              h('li', {}, md('**별도 테스트 데이터로 평가** — 떼어 둔 데이터로 시험. 홀드아웃(13번 카드)이에요.'))));
-      }
+          h('div', { class: 'concept' }, md('데이터가 **17개뿐** 이라 시험 데이터는 5개예요. 어떤 5개가 뽑히느냐에 따라 R² 가 크게 달라져요.')),
+          교재메모('교재는 결정계수 **0.89** 를 얻었다고 해요. 교재도 「연결선에 따라 결정계수 값이 다르게 나올 수 있다」고 적어 두었어요. 내 결과가 교재와 다르다고 틀린 것이 아니에요.'),
+          퀴즈([{ 질문: '결과를 믿을 만하게 하려면?', 보기: ['R² 가 가장 높게 나온 한 번만 발표한다', '여러 번 해 보거나 데이터를 더 모은다'], 답: 1, 해설: '좋은 결과만 골라 보이는 것은 데이터를 속이는 일이에요.' }], { 열쇠: 'u4.resample-q' }),
+          h('div', { class: 'concept' }, md('홀드아웃 점수 **하나만으로는** 믿기 어려워요. 시험을 한 번만 보지 말고 **돌아가며 여러 번** 보면? → 맨 끝 **⭐ 심화 카드** 의 **교차 검증**')))));
     }, '교재 23쪽'),
 
     // 성취기준 [12데과03-02] 의 알맹이 — 같은 데이터를 두 방법으로 분석한 결과를 견준다.
@@ -814,7 +888,7 @@ export default {
           ], [
             { 부터: 'lr', 까지: 'pr1', 글: '모델 (Model) → Predictors' },
             { 부터: 'f3', 까지: 'pr1', 글: '데이터 (Data)' },
-          ], { 너비: 336, 높이: 192, 키: 150 }),
+          ], { 너비: 336, 높이: 192, 키: 138 }),
           퀴즈([
             { 질문: '새 데이터 파일을 **선형회귀** 에는 잇지 않아요. 왜일까요?',
               보기: ['이으면 그 데이터로 **다시 학습** 하려 한다 — 새 데이터엔 정답이 없고, 만든 모델로 **예측만** 하면 된다', '선형회귀에는 파일을 하나만 이을 수 있어서', '예측 결과 보기가 학습까지 해 주니까'], 답: 0,
@@ -896,5 +970,78 @@ export default {
         h('div', { class: 'row end' }, h('button', { type: 'button', class: 'btn', onclick: 활동지4 }, '💾 활동지 내려받기 (HTML)')));
     }, '교재 25쪽'),
 
+
+    // ⭐ 심화 — 교차 검증(2026-11-08 사용자 정정 지시: 모델 검증 및 평가에서 교차 검증을 하는 방법을 맨 끝 카드에서 개념과 함께).
+    //   10번 카드와 같은 연결(열 선택 → 데이터, 선형회귀 → 학습 알고리즘)에서 평가 방법만 교차 검증으로 바꾼다 — 데이터 전체 17개를 돌아가며.
+    //   견주기 표에는 10번(학습 데이터로 직접 평가)·13번(별도 테스트 데이터로 평가) 카드의 점수를 함께 둔다.
+    카드('심화 · 교차 검증 — 돌아가며 시험 보기', '심화', (몸) => {
+      const 표 = 수면비만(), n = 표.행.length;
+      const 해 = 표.행.map((r) => `'${String(r.시점).slice(-2)}`);
+      const 시험해 = 훈련과시험(표.행, 고정씨앗).나눔.시험;
+      const 홀드 = 홀드아웃여러번(표.행, Array.from({ length: 100 }, (_, i) => i + 1)).sort((a, b) => a - b);
+      let 방법 = 'cv', k = 5, 씨앗 = 1, 끝낸 = 0;
+      let cv = 교차검증(표.행, k, 씨앗);
+      const 섞은 = [];   // 지금 폴드 수로 끝까지 돌려 본 R² — 다시 섞을 때마다 하나씩 는다
+      let 기록됨 = false;
+      const 격자 = h('div', {}), 단추줄 = h('div', { class: 'row' }), 알림 = h('p', { class: 'small cv-note' }), 견주기 = h('div', {}), 경고 = h('div', {});
+      const 고정점수 = { train: 평가방법점수(표.행, 'train'), test: 평가방법점수(표.행, 'test'), loo: 평가방법점수(표.행, 'loo') };
+      function 그리기() {
+        const 줄들 = 방법 === 'cv' || 방법 === 'loo'
+          ? cv.판들.map((판, f) => ({ 이름: `${f + 1}판`, 칸: (i) => (판.시험.includes(i) ? '시' : '학'), 흐림: f >= 끝낸 }))
+          : 방법 === 'train' ? [{ 이름: '학습', 칸: () => '학' }, { 이름: '시험', 칸: () => '시' }]
+            : [{ 이름: '학습', 칸: (i) => (시험해.includes(i) ? '-' : '학') }, { 이름: '시험', 칸: (i) => (시험해.includes(i) ? '시' : '-') }];
+        채우기(격자, 평가격자(줄들, 해, [], { 앞이름: `데이터 ${n}개 (한 칸 = 한 해)` }));
+        채우기(단추줄, 방법 === 'cv' ? [
+          h('button', { type: 'button', class: 'btn primary small', onclick: () => { if (끝낸 < k) { 끝낸++; 다했나(); } 그리기(); } }, '▶ 한 판씩'),
+          h('button', { type: 'button', class: 'btn small', onclick: () => { 끝낸 = k; 다했나(); 그리기(); } }, '⏩ 끝까지'),
+          h('button', { type: 'button', class: 'btn small', onclick: () => { 씨앗 = 2 + Math.floor(Math.random() * 1e6); cv = 교차검증(표.행, k, 씨앗); 끝낸 = 0; 기록됨 = false; 그리기(); } }, '🔀 다시 섞기')] : null);
+        채우기(알림, md({
+          cv: 끝낸 === 0 ? `**▶ 한 판씩** 을 눌러 보세요. 한 줄이 한 판이고, **주황 칸** 이 그 판의 시험 데이터예요.`
+            : 끝낸 < k ? `**${끝낸}판** — 시험: ${cv.판들[끝낸 - 1].시험.map((i) => 해[i]).join(' · ')} (${cv.판들[끝낸 - 1].시험.length}개) · 학습: 나머지 ${cv.판들[끝낸 - 1].학습.length}개`
+              : `**${k}판 모두 끝!** 모델을 ${k}번 만들었고, ${n}개가 **꼭 한 번씩** 시험을 봤어요. 판마다의 예측을 모아 한 번에 점수를 내요. **🔀 다시 섞기** 를 해 보면 홀드아웃보다 **훨씬 덜 흔들려요**.`,
+          loo: `폴드 수를 데이터 수(${n})만큼 — **하나씩 빼고 ${n}번** 해요. 나누는 데 운이 끼어들 자리가 없어 몇 번을 해도 같은 값이에요.`,
+          train: `**10번 카드** — 전체 ${n}개로 배우고 **같은 ${n}개** 로 시험해요. 처음 보는 데이터에서의 실력은 알 수 없어요.`,
+          test: `**13번 카드** — 샘플 12개로 배우고 **남은 5개** 로 시험해요. 이렇게 하려면 선 연결을 바꿔야 해요. 5개뿐이라 운이 섞여요.`,
+        }[방법]));
+        const 줄 = (m, 이름, 쓴, 값) => h('tr', { class: m === 방법 ? 'hl' : '' }, h('td', {}, 이름), h('td', { class: 'small' }, 쓴), h('td', { class: 'num' }, 값));
+        채우기(견주기, h('table', { class: 'kv small cv-cmp' },
+          h('thead', {}, h('tr', {}, h('th', {}, '평가 방법'), h('th', {}, '시험에 쓴 데이터'), h('th', { class: 'num' }, 'R²'))),
+          h('tbody', {},
+            줄('train', '학습 데이터로 직접 평가 (10번)', `배운 ${n}개 그대로`, 수(고정점수.train.R2, 2)),
+            줄('cv', `교차 검증 ${k}겹`, `${n}개를 돌아가며${섞은.length > 1 ? ` · 섞어서 ${섞은.length}번` : ''}`,
+              방법 === 'cv' && 끝낸 < k && !섞은.length ? '끝까지 돌려 보세요' : 섞은.length > 1 ? `${수(Math.min(...섞은), 2)} ~ ${수(Math.max(...섞은), 2)}` : 수((섞은[0] ?? cv.점수.R2), 2)),
+            줄('loo', 'LOOCV (하나 빼고 검증)', `하나씩 ${n}번`, 수(고정점수.loo.R2, 2)),
+            줄('test', '별도 테스트 데이터로 평가 (13번)', '떼어 둔 5개', 수(고정점수.test.R2, 2)),
+            줄('hold', '홀드아웃 100번 (14번)', '떼어 둔 5개 · 100번', `${수(홀드[0], 2)} ~ ${수(홀드[99], 2)}`))));
+      }
+      function 다했나() {
+        if (끝낸 === k && !기록됨) { 섞은.push(cv.점수.R2); 기록됨 = true; 마침('u4.cv'); }
+      }
+      const 고르기 = (m) => {
+        방법 = m; 채우기(경고);
+        if (m === 'loo') { cv = 교차검증(표.행, n); 끝낸 = n; }
+        else if (m === 'cv') { cv = 교차검증(표.행, k, 씨앗); 끝낸 = 0; 기록됨 = false; }
+        그리기();
+      };
+      const 폴드 = h('select', { class: 'ow-combo', 'aria-label': '폴드 수' }, [2, 3, 5, 10, 20].map((v) => h('option', { value: v, selected: v === 5 }, String(v))));
+      폴드.addEventListener('change', () => {
+        const v = Number(폴드.value);
+        // 데이터보다 많은 묶음으로는 나눌 수 없다 — 받지 않고 지금 폴드 수로 되돌린다
+        if (v > n) { 채우기(경고, h('p', { class: 'feedback bad' }, `데이터가 ${n}개뿐이라 ${v}묶음으로는 나눌 수 없어요. 오렌지도 이때는 오류를 알려요.`)); 폴드.value = String(k); return; }
+        k = v; 섞은.length = 0;
+        const 교차단추 = 몸.querySelector('input[name="tas-cv"]');
+        if (교차단추) 교차단추.checked = true;
+        고르기('cv');
+      });
+      그리기();
+      채우기(몸, h('div', { class: 'two' },
+        h('div', {},
+          h('div', { class: 'concept' }, md('**교차 검증(k-겹, k-fold cross validation)** — 데이터를 **k 묶음(폴드)** 으로 나누고, 한 묶음씩 **돌아가며** 시험으로 써요. 나머지로 학습하니 모델을 k 번 만들고, **모든 데이터가 꼭 한 번씩** 처음 보는 데이터로 시험을 봐요. 데이터가 적어 떼어 두기 아까울 때 특히 좋아요.')),
+          h('p', { class: 'small' }, md('**오렌지에서는** 10번 카드의 연결(열 선택 → **데이터**, 선형회귀 → **학습 알고리즘**)을 그대로 두고, 모델 검증 및 평가 창에서 **교차 검증** 을 고르고 **폴드 수** 를 정해요.')),
+          격자, 단추줄, 알림),
+        h('div', {},
+          평가창({ 이름: 'tas-cv', 바뀜: 고르기, 폴드칸: 폴드, 켬: ['cv', 'loo', 'train', 'test'], 간단: true }),
+          경고, 견주기)));
+    }, '교재 23쪽'),
   ],
 };

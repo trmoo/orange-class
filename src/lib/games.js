@@ -222,11 +222,16 @@ export function 빈칸(칸들, { 열쇠, 힌트 } = {}) {
 }
 
 /** 글쓰기 칸 — 쓰는 대로 이 브라우저에 저장된다 */
-export function 쓰기(열쇠, { 안내 = '', 줄수 = 3, 예시 = '' } = {}) {
+export function 쓰기(열쇠, { 안내 = '', 줄수 = 3, 예시 = '', 답안 = '', 답안글자 = 5 } = {}) {
   const 칸 = h('textarea', { class: 'write', rows: 줄수, placeholder: 예시 || '여기에 적어 보세요.', 'aria-label': 안내 || '글쓰기' });
+  // 답안: 띄어쓰기를 빼고 답안글자 이상 쓰면 칸 아래에 예시 답안을 보여 준다(먼저 스스로 써 보게)
+  const 답칸 = 답안 ? h('div', { class: 'feedback info answer-box' }, '💡 예시 답안 — ', md(답안)) : null;
+  const 답보기 = () => { if (답칸) 답칸.style.display = 칸.value.replace(/\s/g, '').length >= 답안글자 ? '' : 'none'; };
   칸.value = 글읽기(열쇠);
-  칸.addEventListener('input', () => { 글쓰기(열쇠, 칸.value); if (칸.value.trim().length >= 10) 마침(열쇠); });
-  return h('label', { class: 'write-wrap' }, 안내 ? h('span', { class: 'write-label' }, md(안내)) : null, 칸);
+  답보기();
+  칸.addEventListener('input', () => { 글쓰기(열쇠, 칸.value); 답보기(); if (칸.value.trim().length >= 10) 마침(열쇠); });
+  const 글칸 = h('label', { class: 'write-wrap' }, 안내 ? h('span', { class: 'write-label' }, md(안내)) : null, 칸);
+  return 답칸 ? h('div', {}, 글칸, 답칸) : 글칸;
 }
 
 /** 체크리스트 — 누를 때마다 저장 */

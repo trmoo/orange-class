@@ -45,7 +45,7 @@ export function 위젯창(이름, ...내용) {
 /**
  * 위젯 연결도 — 이미 이어 둔 위젯 흐름을 그림으로만 보여 준다(조립 활동 없이).
  * 위젯들: [{ id, 위젯, 이름줄: ['파일 불러오기 (File)'], x, y }]
- * 선들: [{ 부터: id, 까지: id, 글: '데이터 (Data)' }]
+ * 선들: [{ 부터: id, 까지: id, 글: '데이터 (Data)' }] — 글을 배열로 주면 여러 줄로 적는다(오렌지처럼 한 선에 신호 둘)
  */
 export function 위젯연결도(위젯들, 선들, { 너비 = 330, 높이 = 230, 키 = 190 } = {}) {
   const 자리 = new Map(위젯들.map((d) => [d.id, d]));
@@ -54,7 +54,8 @@ export function 위젯연결도(위젯들, 선들, { 너비 = 330, 높이 = 230,
     const a = 자리.get(부터), b = 자리.get(까지);
     const 가운데 = (a.x + b.x) / 2;
     그림판.append(s('path', { d: `M${a.x + 30},${a.y} C${가운데},${a.y} ${가운데},${b.y} ${b.x - 30},${b.y}`, class: 'ow-link' }));
-    if (글) 그림판.append(s('text', { x: 가운데, y: (a.y + b.y) / 2 - 8, class: 'ow-link-label', 'text-anchor': 'middle' }, 글));
+    const 줄들 = [].concat(글 || []);
+    줄들.forEach((t, i) => 그림판.append(s('text', { x: 가운데, y: (a.y + b.y) / 2 - 8 - (줄들.length - 1 - i) * 14, class: 'ow-link-label', 'text-anchor': 'middle' }, t)));
   }
   for (const d of 위젯들) {
     const [갈래, 그림] = 위젯목록[d.위젯] || ['Data', '❔'];

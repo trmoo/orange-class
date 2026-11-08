@@ -143,14 +143,15 @@ export function 백분율오차(ys, ps) {
  * 오렌지 Data Sampler 처럼 「정해진 비율」로 나눈다.
  * 씨앗이 같으면 늘 같게 나뉜다. → { 훈련: [번호...], 시험: [번호...] }
  */
-export function 나누기(개수, 비율 = 0.7, 씨앗 = 1) {
+export function 나누기(개수, 비율 = 0.7, 씨앗 = 1, 올림 = false) {
   const rnd = 난수(씨앗);
   const 번호 = [...Array(개수).keys()];
   for (let i = 번호.length - 1; i > 0; i--) {
     const j = Math.floor(rnd() * (i + 1));
     [번호[i], 번호[j]] = [번호[j], 번호[i]];
   }
-  const 몇 = Math.round(개수 * 비율);
+  // 올림: 오렌지 Data Sampler 처럼 샘플 수를 올림으로 센다(17개의 60 % → 11개). 소수 셈 오차(17 × 0.7 = 11.899…)는 걷어 낸다
+  const 몇 = 올림 ? Math.ceil(개수 * 비율 - 1e-9) : Math.round(개수 * 비율);
   return { 훈련: 번호.slice(0, 몇).sort((a, b) => a - b), 시험: 번호.slice(몇).sort((a, b) => a - b) };
 }
 
