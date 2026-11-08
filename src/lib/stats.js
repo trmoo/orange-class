@@ -128,6 +128,18 @@ export function 성능(ys, ps) {
 }
 
 /**
+ * 백분율 오차(%) — 오렌지 「예측 결과 보기(Predictions)」 의 성능 점수에 함께 나오는 두 가지.
+ * MAPE : 오차를 실제 값으로 나눈 비율의 평균 · sMAPE : 실제 값과 예측값 크기의 평균으로 나눈 비율의 평균.
+ * (2026-11-08 오렌지 화면의 값과 같은 식인지 맞대어 확인했다)
+ */
+export function 백분율오차(ys, ps) {
+  const n = ys.length;
+  const MAPE = (100 * 합(ys.map((y, i) => Math.abs(ps[i] - y) / Math.abs(y)))) / n;
+  const sMAPE = (100 * 합(ys.map((y, i) => (2 * Math.abs(ps[i] - y)) / (Math.abs(y) + Math.abs(ps[i]))))) / n;
+  return { MAPE, sMAPE };
+}
+
+/**
  * 오렌지 Data Sampler 처럼 「정해진 비율」로 나눈다.
  * 씨앗이 같으면 늘 같게 나뉜다. → { 훈련: [번호...], 시험: [번호...] }
  */

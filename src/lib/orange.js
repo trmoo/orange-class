@@ -10,7 +10,7 @@ import { 끝냄 } from './store.js';
 // 위젯 → [갈래, 그림 글자]. 갈래 색은 오렌지 위젯 상자의 갈래 색을 따랐다.
 const 갈래색 = { Data: '#ffd39f', Transform: '#ff9d5e', Visualize: '#ffb7b1', Model: '#fac1d9', Evaluate: '#c3f3f3', Unsupervised: '#cae1ef', Associate: '#e2d4f6' };
 export const 위젯목록 = {
-  'File': ['Data', '📄'], 'Data Table': ['Data', '🗒️'], 'Feature Statistics': ['Data', '📋'],
+  'File': ['Data', '📄'], 'Data Table': ['Data', '🗒️'], 'Feature Statistics': ['Data', '📋'], 'Column Statistics': ['Data', '📏'],
   'Merge Data': ['Transform', '🔗'], 'Select Columns': ['Transform', '▥'], 'Select Rows': ['Transform', '☰'],
   'Data Sampler': ['Transform', '🎲'], 'Preprocess': ['Transform', '🧹'], 'Discretize': ['Transform', '✂️'], 'Impute': ['Transform', '🩹'],
   'Scatter Plot': ['Visualize', '⁘'], 'Distributions': ['Visualize', '📊'], 'Box Plot': ['Visualize', '⊟'],
@@ -80,22 +80,45 @@ export function 라디오(이름, 선택지, 처음, 바뀜) {
 
 /**
  * 위젯 흐름 조립기.
- * 단계: [{ id, 위젯, 부제?, 부모: [id...], 할일: '두 파일을 하나로 합쳐요', x, y, 신호? }]
+ * 단계: [{ id, 위젯, 부제?, 이름줄?, 부모: [id...], 할일: '두 파일을 하나로 합쳐요', x, y, 신호?, 힌트?, 오답? }]
+ *  · 이름줄: ['데이터 병합(열/조인)', '(Merge Data)'] 처럼 주면 캔버스에 위젯 이름을 이 글로(여러 줄) 적는다 — 한국어판 오렌지 화면처럼.
+ *  · 신호: { 부모id: '데이터 (Data)' } 또는 { 부모id: { 글: '…', t: 0.4, 아래: true } } — 선 위에 적는 글.
+ *    t 는 선 위의 자리(0~1, 기본 0.5), 아래 는 선 아래쪽에 적기(글돌리기 일 때만). 선이 붐비는 자리에서 글끼리 겹치지 않게 옮길 때 쓴다.
+ *  · 오답: { 'Test and Score': '…' } — 그 위젯을 잘못 눌렀을 때만 따로 주는 힌트. 없으면 힌트, 그것도 없으면 기본 힌트.
+ * 선택: 글돌리기 — 선 위의 글을 선의 기울기대로 돌려 적는다(오렌지 캔버스처럼). 끝글 — 다 이었을 때 알림 글.
  * 위젯 상자(팔레트)에서 알맞은 위젯을 차례로 눌러 캔버스에 놓는다. 틀리면 힌트를 준다.
  */
-export function 흐름조립(단계들, { 열쇠, 팔레트, 높이 = 300, 너비 = 900, 다됨, 미리 = [] } = {}) {
+export function 흐름조립(단계들, { 열쇠, 팔레트, 높이 = 300, 너비 = 900, 다됨, 미리 = [], 글돌리기 = false, 끝글 } = {}) {
   let 지금 = 0;
   const 줄 = 알림줄();
-  // 위젯 이름은 동그라미 중심에서 48 아래에 적힌다. 맨 아래 위젯의 이름이 캔버스 밖으로 잘리면,
+  // 위젯 이름은 동그라미 중심에서 48 아래에(이름줄이면 46 아래부터 15 간격으로) 적힌다. 맨 아래 위젯의 이름이 캔버스 밖으로 잘리면,
   // 그만큼을 먼저 맨 위 위젯 위쪽의 빈자리에서 가져오고(캔버스 키가 그대로라 카드가 넘치지 않는다), 모자라면 키를 늘린다.
-  const 높이들 = [...단계들, ...미리].map((d) => d.y);
-  const 넘침 = Math.max(0, Math.max(...높이들) + 58 - 높이);
-  const 위 = Math.min(넘침, Math.max(0, Math.min(...높이들) - 40));
+  const 아래끝 = (d) => d.y + (d.이름줄 ? 46 + (d.이름줄.length - 1) * 15 + 12 : 58);
+  const 모두 = [...단계들, ...미리];
+  const 넘침 = Math.max(0, Math.max(...모두.map(아래끝)) - 높이);
+  const 위 = Math.min(넘침, Math.max(0, Math.min(...모두.map((d) => d.y)) - 40));
   const 캔버스 = s('svg', { viewBox: `0 ${위} ${너비} ${높이 + 넘침 - 위}`, class: 'ow-canvas' });
   const 할일줄 = h('div', { class: 'flow-task' });
   const 상자들 = h('div', { class: 'ow-palette' });
   const 놓인 = new Map();
   const 목록 = 팔레트 || [...new Set(단계들.map((d) => d.위젯))].sort();
+  const 이름글 = (d) => (d.이름줄 ? d.이름줄.join(' ') : d.부제 ? `${d.위젯} (${d.부제})` : d.위젯);
+
+  // 선 위의 글 — 선은 a 오른쪽 끝에서 d 왼쪽 끝까지 잇는 3차 베지어 곡선이다(조절점 둘은 가운데 x 에 있다)
+  function 선글(a, d, 신호) {
+    const { 글, t = 0.5, 아래 = false } = typeof 신호 === 'string' ? { 글: 신호 } : 신호;
+    if (!글돌리기) return s('text', { x: (a.x + d.x) / 2, y: (a.y + d.y) / 2 - 8, class: 'ow-link-label', 'text-anchor': 'middle' }, 글);
+    const m = (a.x + d.x) / 2, P = [[a.x + 30, a.y], [m, a.y], [m, d.y], [d.x - 30, d.y]];
+    const u = 1 - t, w = [u * u * u, 3 * u * u * t, 3 * u * t * t, t * t * t];
+    const 점 = [0, 1].map((k) => w.reduce((합, c, i) => 합 + c * P[i][k], 0));
+    // 접선 방향 = 곡선의 미분. 글은 그 방향으로 돌리고, 선에서 5만큼 위쪽(글자 머리 쪽)으로 띄운다.
+    // 아래: true 면 선 아래쪽에 적는다 — 글자 키(12)만큼 더 내려 글자 머리가 선에서 3쯤 떨어지게
+    const 기울기 = [0, 1].map((k) => 3 * u * u * (P[1][k] - P[0][k]) + 6 * u * t * (P[2][k] - P[1][k]) + 3 * t * t * (P[3][k] - P[2][k]));
+    const 각 = Math.atan2(기울기[1], 기울기[0]);
+    const 띄움 = 아래 ? -15 : 5;
+    const x = 점[0] + Math.sin(각) * 띄움, y = 점[1] - Math.cos(각) * 띄움;
+    return s('text', { x, y, transform: `rotate(${(각 * 180 / Math.PI).toFixed(1)} ${x.toFixed(1)} ${y.toFixed(1)})`, class: 'ow-link-label along', 'text-anchor': 'middle' }, 글);
+  }
 
   function 노드그리기(d) {
     const [갈래, 그림] = 위젯목록[d.위젯];
@@ -103,25 +126,26 @@ export function 흐름조립(단계들, { 열쇠, 팔레트, 높이 = 300, 너�
       const a = 놓인.get(p);
       const 선 = s('path', { d: `M${a.x + 30},${a.y} C${(a.x + d.x) / 2},${a.y} ${(a.x + d.x) / 2},${d.y} ${d.x - 30},${d.y}`, class: 'ow-link' });
       캔버스.prepend(선);
-      if (d.신호?.[p]) 캔버스.append(s('text', { x: (a.x + d.x) / 2, y: (a.y + d.y) / 2 - 8, class: 'ow-link-label', 'text-anchor': 'middle' }, d.신호[p]));
+      if (d.신호?.[p]) 캔버스.append(선글(a, d, d.신호[p]));
     }
     캔버스.append(s('g', { class: 'ow-node' },
       s('circle', { cx: d.x, cy: d.y, r: 28, fill: 갈래색[갈래], stroke: '#888', 'stroke-width': 1.5 }),
       s('text', { x: d.x, y: d.y + 8, 'text-anchor': 'middle', class: 'ow-node-icon' }, 그림),
-      s('text', { x: d.x, y: d.y + 48, 'text-anchor': 'middle', class: 'ow-node-name' }, d.부제 ? `${d.위젯} (${d.부제})` : d.위젯)));
+      d.이름줄 ? d.이름줄.map((글, i) => s('text', { x: d.x, y: d.y + 46 + i * 15, 'text-anchor': 'middle', class: 'ow-node-name' }, 글))
+        : s('text', { x: d.x, y: d.y + 48, 'text-anchor': 'middle', class: 'ow-node-name' }, 이름글(d))));
     놓인.set(d.id, d);
   }
 
   function 갱신() {
     if (지금 >= 단계들.length) {
       채우기(할일줄, '✅ 위젯 흐름을 모두 이었습니다!');
-      줄.맞음('오렌지에서도 이 순서대로 위젯을 놓고 선을 이으면 됩니다.');
+      줄.맞음(끝글 || '오렌지에서도 이 순서대로 위젯을 놓고 선을 이으면 됩니다.');
       if (열쇠) { 끝냄(열쇠); document.dispatchEvent(new CustomEvent('activity-done', { detail: 열쇠 })); }
       다됨?.();
       return;
     }
     const d = 단계들[지금];
-    const 앞 = d.부모.map((p) => { const x = 놓인.get(p); return x.부제 ? `${x.위젯} (${x.부제})` : x.위젯; });
+    const 앞 = d.부모.map((p) => 이름글(놓인.get(p)));
     채우기(할일줄, h('b', {}, `${지금 + 1}/${단계들.length} `), md(d.할일), 앞.length ? h('span', { class: 'muted' }, ` ← ${앞.join(' + ')} 에 이어 붙여요`) : null);
   }
 
@@ -131,7 +155,7 @@ export function 흐름조립(단계들, { 열쇠, 팔레트, 높이 = 300, 너�
       if (지금 >= 단계들.length) return;
       const d = 단계들[지금];
       if (이름 === d.위젯) { 노드그리기(d); 지금++; 줄.지우기(); 갱신(); }
-      else 줄.틀림(d.힌트 || `「${이름}」 위젯이 하는 일과 지금 할 일을 견주어 보세요.`);
+      else 줄.틀림(d.오답?.[이름] || d.힌트 || `「${이름}」 위젯이 하는 일과 지금 할 일을 견주어 보세요.`);
     },
   }, 위젯(이름, { 작게: true }))));
   // 지난 프로젝트에서 이미 놓아 둔 위젯은 처음부터 그려 둔다

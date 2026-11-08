@@ -239,6 +239,12 @@ button.qdot.on:hover { outline-color: #f5c08a; }
 .ow-link { fill: none; stroke: #8a8a8a; stroke-width: 2.5; stroke-dasharray: 600; animation: draw .6s ease-out; }
 @keyframes draw { from { stroke-dashoffset: 600; } to { stroke-dashoffset: 0; } }
 .ow-link-label { font-size: 12px; fill: #777; }
+/* 선의 기울기대로 돌린 글 — 선이 겹치는 자리에서도 읽히게 흰 테두리를 두른다 */
+.ow-link-label.along { paint-order: stroke; stroke: #fff; stroke-width: 3px; stroke-linejoin: round; }
+/* 4단원 흐름 카드 — ① 통계적 / ② 기계학습 흐름을 고르는 줄 */
+.flow-switch { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+.flow-switch .seg { flex: none; }
+.flow-switch p { margin: 0; }
 .ow-node { animation: pop .3s ease-out; transform-box: fill-box; transform-origin: center; }
 @keyframes pop { from { transform: scale(.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 .ow-node-icon { font-size: 22px; }
@@ -352,3 +358,51 @@ code { background: #f3eee8; border-radius: 5px; padding: 1px 6px; font-family: C
 .cv-cmp { width: 100%; font-size: .88rem; margin: 4px 0; }
 .cv-map { margin: 0; padding-left: 1.2em; }
 .cv-map li { margin: 4px 0; }
+/* 4단원 11번 예측 결과 보기 · 15번 두 분석 견주기 · 17·18번 처음 보는 데이터 (2026-11-08) */
+.ow-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 2px 0 4px; font-size: .9rem; }
+.ow-line .ow-combo { margin-left: 0; }
+.ow-btn.small { padding: 1px 8px; font-size: .78rem; margin-left: auto; cursor: default; color: #333; }
+.ow-table.score td:first-child { text-align: left; }
+.kv.calc td, .kv.calc th { padding: 4px 8px; }
+.kv.calc .blank { width: 5em; }
+.kv.cmp { margin: 4px 0 8px; }
+.kv.cmp td, .kv.cmp th { padding: 4px 8px; vertical-align: middle; }
+.kv.cmp .blank { width: 4.2em; padding: 2px 4px; }
+.kv.cmp-grid td, .kv.cmp-grid th { padding: 5px 8px; vertical-align: middle; }
+.seg.yn button { padding: 3px 12px; }
+.seg.ok { border-color: var(--green); }
+.seg.bad { border-color: var(--red); }
+.judge-key { background: #fdf6ee; border-radius: 10px; padding: 6px 12px; line-height: 1.5; }
+.kv.judge td, .kv.judge th { padding: 1px 8px; vertical-align: middle; }
+.judge-chips { display: inline-flex; gap: 3px; border-radius: 999px; padding: 1px; border: 2px solid transparent; }
+.judge-chips.ok { border-color: var(--green); }
+.judge-chips.bad { border-color: var(--red); }
+.judge-chips .chip.picked { transform: none; }
+/* 정답 확인 단추와 알림 줄을 한 줄에 — 카드 높이를 아끼려고 */
+.row.check { flex-wrap: nowrap; align-items: flex-start; }
+.row.check .btn { flex: none; }
+.row.check .feedback { flex: 1; margin: 0; }
+.kv.cmp td[rowspan] { border-bottom: 2px solid var(--line); }
+.kv.cmp tr.first td { border-top: 2px solid var(--line); }
+.kv.cmp td.who { white-space: nowrap; color: var(--muted); font-size: .85rem; }
+/* 6단원 보충 카드 (2026-11-08) — 열별 통계량 · k 정하기 · 박스플롯 읽기 · 달별 군집 · 결과 정리 */
+.ow-table td.name { text-align: left; white-space: nowrap; }
+.ow-type { display: inline-block; width: 1.25em; text-align: center; border-radius: 3px; background: #c62828; color: #fff; font-size: .72rem; font-weight: 800; }
+.kv.k-table td, .kv.k-table th { padding: 2px 8px; }
+.k-now { margin: 4px 0; }
+.orange-box { width: 100%; height: auto; background: #fff; border: 1px solid #ddd; border-radius: 6px; }
+.ob-label { font-size: 14px; font-weight: 700; fill: #222; }
+.ob-num { font-size: 12px; fill: #333; }
+.kv.month-grid { font-size: .78rem; }
+.kv.month-grid td, .kv.month-grid th { padding: 3px 4px; text-align: center; }
+.stage-pick { width: 100%; margin: 4px 0 0; }
+.stage-pick.ok { border-color: var(--green); background: var(--green-soft); }
+.stage-pick.bad { border-color: var(--red); background: var(--red-soft); }
+.grow { flex: 1; min-width: 0; margin: 0; }
+.summary-line { line-height: 2.3; font-size: 1.02rem; }
+.summary-line .blank, .summary-line .pick { margin: 0 3px; }
+/* 옷차림 표 — 군집 카드를 한 줄로 늘어놓고, 군집이 많으면(k 6~8) 가로로 넘겨 본다(카드 높이가 1280×720 을 넘지 않게) */
+.outfit-grid.one-row { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(228px, 1fr); overflow-x: auto; padding-bottom: 4px; }
+.outfit-grid.one-row .outfits .chip.small { padding: 1px 6px; font-size: .74rem; }
+.kv.month-grid td, .kv.month-grid th { padding: 1px 4px; }
+.outfit-stat { font-size: .76rem; line-height: 1.35; }
