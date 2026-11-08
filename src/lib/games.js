@@ -4,6 +4,7 @@
  */
 import { h, 채우기, md, 조사 } from './ui.js';
 import { 끝냄, 끝났나, 글읽기, 글쓰기, 상태, 저장 } from './store.js';
+import { 다푼모습 } from './capture.js';
 
 /** 활동을 끝냈다고 알리고(진행 표시 갱신용) 기록한다 */
 function 마침(열쇠) {
@@ -41,6 +42,11 @@ export function 알림줄() {
  * 이미 끝낸 퀴즈 카드에 다시 오면 다 푼 모습(마지막 문항)으로 그린다.
  */
 export function 퀴즈(문항들, { 열쇠, 제목 } = {}) {
+  // 캡처 모드(활동 정리 PDF)에서 끝낸 퀴즈는 모든 문항을 정답·해설과 함께 한꺼번에 보인다 — 복습용
+  if (다푼모습(열쇠)) return h('div', { class: 'quiz quiz-all' }, 제목 ? h('b', {}, 제목) : null, 문항들.map((q, i) => h('div', { class: 'quiz-done' },
+    h('p', { class: 'quiz-q' }, h('b', {}, `Q${i + 1}. `), md(q.질문)),
+    h('div', { class: 'choice ok' }, '✔ ', md(q.보기[q.답])),
+    q.해설 ? h('p', { class: 'small muted quiz-why' }, md(q.해설)) : null)));
   const 끝 = 문항들.length - 1;
   const 이미끝 = !!열쇠 && 끝났나(열쇠);
   let 지금 = 이미끝 ? 끝 : 0;
@@ -143,8 +149,9 @@ export function 나누기(항목들, 바구니들, { 열쇠, 안내 = '카드를
  */
 export function 순서(항목들, { 열쇠, 안내 = '첫 단계부터 차례대로 누르세요.', 가로 = false } = {}) {
   const 섞은 = 섞기([...항목들.keys()], 항목들.length * 5 + 3);
-  const 고른것 = [];
+  const 고른것 = 다푼모습(열쇠) ? [...항목들.keys()] : [];   // 캡처 모드에서 끝냈으면 맞힌 차례 그대로
   const 줄 = 알림줄();
+  if (고른것.length) 줄.맞음('순서를 모두 맞혔습니다!');
   const 상자 = h('div', { class: 'orderer' });
   function 그리기() {
     채우기(상자,
@@ -177,6 +184,7 @@ export function 순서(항목들, { 열쇠, 안내 = '첫 단계부터 차례대
 export function 짝짓기(쌍들, 보기들, { 열쇠, 왼제목 = '', 오른제목 = '' } = {}) {
   const 줄 = 알림줄();
   const 고름 = 쌍들.map(() => h('select', { class: 'pick' }, h('option', { value: '' }, '— 고르세요 —'), 보기들.map((b) => h('option', { value: b }, b))));
+  if (다푼모습(열쇠)) { 고름.forEach((sel, i) => { sel.value = 쌍들[i].답; sel.classList.add('ok'); }); 줄.맞음('모두 맞았습니다!'); }   // 캡처 모드
   return h('div', { class: 'matcher' },
     h('table', { class: 'match-table' },
       왼제목 || 오른제목 ? h('thead', {}, h('tr', {}, h('th', {}, 왼제목), h('th', {}, 오른제목))) : null,

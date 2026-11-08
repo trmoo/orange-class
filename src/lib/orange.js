@@ -6,6 +6,7 @@
 import { h, s, 채우기, md } from './ui.js';
 import { 알림줄 } from './games.js';
 import { 끝냄 } from './store.js';
+import { 다푼모습 } from './capture.js';
 
 // 위젯 → [갈래, 그림 글자]. 갈래 색은 오렌지 위젯 상자의 갈래 색을 따랐다.
 const 갈래색 = { Data: '#ffd39f', Transform: '#ff9d5e', Visualize: '#ffb7b1', Model: '#fac1d9', Evaluate: '#c3f3f3', Unsupervised: '#cae1ef', Associate: '#e2d4f6' };
@@ -137,10 +138,12 @@ export function 흐름조립(단계들, { 열쇠, 팔레트, 높이 = 300, 너�
     놓인.set(d.id, d);
   }
 
+  let 되살림 = false;   // 캡처 모드에서 다 이은 모습으로 되살릴 때는 「끝냄」·다됨 을 다시 부르지 않는다
   function 갱신() {
     if (지금 >= 단계들.length) {
       채우기(할일줄, '✅ 위젯 흐름을 모두 이었습니다!');
       줄.맞음(끝글 || '오렌지에서도 이 순서대로 위젯을 놓고 선을 이으면 됩니다.');
+      if (되살림) return;
       if (열쇠) { 끝냄(열쇠); document.dispatchEvent(new CustomEvent('activity-done', { detail: 열쇠 })); }
       다됨?.();
       return;
@@ -161,6 +164,7 @@ export function 흐름조립(단계들, { 열쇠, 팔레트, 높이 = 300, 너�
   }, 위젯(이름, { 작게: true }))));
   // 지난 프로젝트에서 이미 놓아 둔 위젯은 처음부터 그려 둔다
   for (const d of 미리) 노드그리기(d);
+  if (다푼모습(열쇠)) { for (const d of 단계들) 노드그리기(d); 지금 = 단계들.length; 되살림 = true; }
   갱신();
   return h('div', { class: 'flow-builder' },
     h('div', { class: 'flow-left' }, h('div', { class: 'ow-pal-title' }, '위젯 상자'), 상자들),
@@ -178,13 +182,15 @@ export function 흐름조립(단계들, { 열쇠, 팔레트, 높이 = 300, 너�
 export function 열고르기(속성들, 답, { 열쇠, 처음 = {} } = {}) {
   const 상자이름 = ['Ignored', 'Features', 'Target', 'Metas'];
   const 설명 = { Ignored: '쓰지 않음', Features: '독립 변수', Target: '종속 변수', Metas: '설명용 (계산에 안 씀)' };
-  const 자리 = Object.fromEntries(속성들.map((a) => [a, 처음[a] || 'Ignored']));
+  // 캡처 모드에서 끝냈으면 정답 자리 그대로 그린다
+  const 자리 = Object.fromEntries(속성들.map((a) => [a, 다푼모습(열쇠) ? (답[a] || 'Ignored') : (처음[a] || 'Ignored')]));
   const 고른 = new Set();
   let 기준 = null;    // Shift 로 범위를 잡을 때 시작하는 속성
   let 끌기 = null;    // 누르고 있는 동안: { 모드: '고르기' | '옮기기', 시작, x, y, 움직임 }
   let 방금끎 = false; // 끌기가 막 끝났을 때 뒤따르는 click 으로 엉뚱하게 옮기지 않게
   const 칩 = new Map(), 상자칸 = new Map();
   const 줄 = 알림줄();
+  if (다푼모습(열쇠)) 줄.맞음('알맞게 옮겼습니다!');
   // 움직임·뗌은 몸 전체에서 받는다 — 붙잡은 단추에서 올라오는 것도, 다른 상자 위의 것도 모두 여기로 온다
   const 몸 = h('div', { class: 'selcols', onpointermove: (e) => 움직일때(e), onpointerup: (e) => 뗐을때(e), onpointercancel: () => { 끌기 = null; 놓을곳지우기(); } });
   const 같은상자 = (b) => 속성들.filter((a) => 자리[a] === b);
