@@ -10,7 +10,9 @@ const 크기 = statSync(길).size;
 if (크기 < 80000) 잘못.push(`크기가 너무 작다(${크기}바이트) — 개발용 껍데기가 빌드된 것 아닌가?`);
 const 저작권 = (글.match(/티쳐무/g) || []).length;
 if (저작권 < 3) 잘못.push(`「티쳐무」가 ${저작권}번뿐 — HTML 주석·배너·푸터 셋은 있어야 한다`);
-if (!글.includes('/*! 오렌지 데이터 교실')) 잘못.push('/*! 배너가 지워졌다 (esbuild.legalComments 확인)');
+// ⚠ 배너는 둘째 줄까지 함께 본다 — 첫 줄은 CSS·HTML 머리 주석과 겹쳐, Vite 8 이 스크립트 배너를 지워도 통과했다(2026-11-09 postBanner 로 고침)
+const 배너 = "/*! 오렌지 데이터 교실 — © 2026 티쳐무 · 모든 권리 보유\n * 학교 수업 목적으로만 이용해 주세요. 무단 배포·상업적 이용을 금합니다. */";
+if (!글.includes(배너)) 잘못.push('스크립트 /*! 배너가 지워졌다 — vite.config.js 의 output.postBanner 를 볼 것(Vite 8 은 banner 를 압축에서 지운다)');
 // 스크립트 안의 글자는 빼고 HTML 쪽 태그만 본다 — jsPDF 코드 속에 「<script src=…」 를 담은 글자열이 있어서(2026-11-09) 그대로 재면 잘못 걸린다
 const 겉 = 글.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, '<script></script>');
 if (/<script[^>]+src=|<link[^>]+rel="stylesheet"/.test(겉)) 잘못.push('바깥 파일을 부르는 태그가 있다 — 한 파일로 합쳐지지 않았다');
