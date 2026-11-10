@@ -201,7 +201,7 @@ button.qdot.on:hover { outline-color: #f5c08a; }
 .ow-box legend { font-weight: 700; font-size: .85rem; padding: 0 4px; }
 .ow-radios { display: flex; flex-direction: column; gap: 2px; }
 .ow-radio { display: flex; gap: 6px; align-items: center; cursor: pointer; }
-.ow-radio input { accent-color: var(--blue); width: 17px; height: 17px; }
+.ow-radio input[type=radio], .ow-radio input[type=checkbox] { accent-color: var(--blue); width: 17px; height: 17px; }   /* 글 칸(Discretize Custom 등)까지 17px 로 눌려 글자가 잘렸다 */
 .ow-window.compact .ow-body { padding: 4px 12px 8px; }
 .ow-window.compact .ow-box { margin: 3px 0; padding: 2px 10px 5px; }
 .ow-window.compact .ow-box .row { margin: 2px 0; }
@@ -419,3 +419,19 @@ code { background: #f3eee8; border-radius: 5px; padding: 1px 6px; font-family: C
 .fig-cap.ratio-note { color: #8a5200; }
 /* 쓰기 칸 아래 예시 답안 — 5글자 이상 쓰면 보인다 */
 .answer-box { margin: 4px 0 0; padding: 5px 12px; font-weight: 600; font-size: .92rem; }
+/* 단원 마무리 카드 — 오렌지3 작업 화면 붙여 넣기 + 활동 정리 PDF (2026-11-09) */
+.finish-q { display: flex; gap: 8px; align-items: baseline; margin: 0 0 8px; font-weight: 700; font-size: 1.05rem; }
+.finish-no { flex: none; background: var(--brand-soft); color: var(--brand-deep); border-radius: 8px; padding: 0 9px; font-weight: 800; }
+.shot-drop { height: 18rem; border: 2.5px dashed #2f9a63; border-radius: 16px; background: #f4f1ea; display: flex; align-items: center; justify-content: center;
+  text-align: center; cursor: pointer; overflow: hidden; padding: 8px; }
+.shot-drop:focus { outline: 3px solid #f8c48c; outline-offset: 2px; }
+.shot-drop.over { background: var(--green-soft); border-color: var(--green); }
+.shot-drop.has { background: #fff; border-style: solid; }
+.shot-empty { color: var(--muted); line-height: 1.9; }
+.shot-empty b { display: block; color: var(--ink); font-size: 1.15rem; margin-bottom: 4px; }
+.shot-empty kbd { display: inline-block; border: 1px solid #c9bfb2; border-bottom-width: 2px; border-radius: 5px; padding: 0 6px; background: #fff;
+  font-family: inherit; font-size: .88em; color: var(--ink); line-height: 1.5; }
+.shot-img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+.shot-row { margin-top: 6px; gap: 8px; align-items: center; }
+.finish-list { margin: 6px 0 0; padding-left: 1.2em; }
+.finish-card .pdf-row { margin-top: 12px; }

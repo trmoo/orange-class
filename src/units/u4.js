@@ -3,7 +3,7 @@
  *  성취기준 [12데과03-02] · 학습 요소: 선형 회귀 · 교과서 108~131쪽
  *  데이터는 연습용으로 새로 만든 값이다(src/data/health.js).
  */
-import { h, s, 채우기, md, 수, 창 } from '../lib/ui.js';
+import { h, s, 채우기, md, 수 } from '../lib/ui.js';
 import { 퀴즈, 순서, 짝짓기, 쓰기, 자기평가, 알림줄 } from '../lib/games.js';
 import { 끝냄, 끝났나, 글읽기, 글쓰기 } from '../lib/store.js';
 import { 다푼모습 } from '../lib/capture.js';
@@ -13,6 +13,7 @@ import { 흐름조립, 위젯창, 위젯연결도, 묶음상자, 라디오, 열�
 import { 카드, 말풍선, 슬라이더, 교재메모 } from './common.js';
 import { 수면표, 비만표, 합치기, 수면비만, 수면열, 비만열 } from './health.js';
 import { 활동지내려받기 } from './project.js';
+import { 활동목록, 마무리카드 } from './finish.js';
 import { 수면csv, 비만csv } from '../data/csv.js';
 
 const 마침 = (열쇠) => { 끝냄(열쇠); document.dispatchEvent(new CustomEvent('activity-done', { detail: 열쇠 })); };
@@ -265,9 +266,9 @@ export const 위젯흐름 = {
       오답: { 'Test and Score': '이번에는 평가가 아니라 **예측** 이에요. 처음 보는 데이터에는 정답(비만율)이 없을 수도 있어요.' } },
   ],
 };
-// ── 1~19번 카드 활동 정리 PDF (2026-11-09 사용자 지시) ─────────────────────────────
-// 1~19번 카드의 활동을 모두 맞혀야(끝내야) 받을 수 있다. 카드 번호는 1부터. 학번·이름은 파일 이름과 PDF 첫 쪽에만 들어가고 저장하지 않는다.
-export const PDF활동 = [
+// ── 4단원 활동 정리 PDF (2026-11-09 사용자 지시) ──────────────────────────────────
+// 1~19번 카드의 활동 + 20번 마무리 카드의 오렌지3 작업 화면. 다 끝내지 않아도 받는다(finish.js). 카드 번호는 1부터.
+export const PDF활동 = 활동목록([
   [2, 'u4.define', '문제 정의 퀴즈'], [3, 'u4.download', '데이터 내려받는 순서'], [4, 'u4.header', '머리글 두 줄을 한 줄로'],
   [6, 'u4.flow-stat', '① 통계적 회귀 분석 흐름'], [6, 'u4.flow-ml', '② 기계학습 기반 회귀 분석 흐름'],
   [7, 'u4.merge-key', '(1) 합치는 기준 속성'], [7, 'u4.merge-why', '(2) 그 까닭 쓰기'], [7, 'u4.merge', '일치하는 행 쌍만 찾기'],
@@ -281,48 +282,7 @@ export const PDF활동 = [
   [17, 'u4.unseen-cmp', '시험 데이터와 견주기'], [17, 'u4.unseen-q', '선형회귀에 잇지 않는 까닭'],
   [18, 'u4.unseen-judge', '믿을 만한지 가리기'], [18, 'u4.unseen-why', '까닭 쓰기'],
   [19, 'u4.interpret', '결과 해석 퀴즈'],
-].map(([카드, 열쇠, 이름]) => ({ 카드, 열쇠, 이름 }));
-
-/** 파일 이름 — 「학번 이름_수면 시간과 비만율.pdf」. 파일 이름에 못 쓰는 글자는 _ 로 바꾼다 */
-export const PDF파일이름 = (학번, 이름) => {
-  const 다듬기 = (t) => String(t).trim().replace(/[\\/:*?"<>|]+/g, '_').replace(/\s+/g, ' ');
-  return `${다듬기(학번)} ${다듬기(이름)}_수면 시간과 비만율.pdf`;
-};
-
-async function PDF받기(단추) {
-  const 제목들 = u4단원.카드.map((c) => c.제목);
-  const 남은 = PDF활동.filter((a) => !끝났나(a.열쇠));
-  // 2026-11-09 사용자 지시 — 다 끝내지 않아도 받을 수 있다. 남은 활동이 있으면 한 번 알려 주고 묻는다
-  if (남은.length) {
-    const 보일 = 남은.slice(0, 8);
-    const 예 = await 창('📄 아직 끝내지 않은 활동이 있어요', h('div', {},
-      h('p', {}, md(`남은 활동 **${남은.length}개** — 그래도 받을 수 있어요. 끝낸 활동은 **다 푼 모습** 으로, 남은 활동은 **지금 모습 그대로** 담겨요.`)),
-      h('ul', { class: 'small pdf-left' }, 보일.map((a) => h('li', {}, `${a.카드}번 「${제목들[a.카드 - 1]}」 — ${a.이름}`)),
-        남은.length > 보일.length ? h('li', { class: 'muted' }, `… 그 밖에 ${남은.length - 보일.length}개`) : null)),
-    [{ 글: '그만두기', 값: false }, { 글: '그래도 받기', 값: true, 주: true }]);
-    if (!예) return;
-  }
-  const 학번칸 = h('input', { type: 'text', class: 'code-input', inputmode: 'numeric', placeholder: '예) 20315', 'aria-label': '학번' });
-  const 이름칸 = h('input', { type: 'text', class: 'code-input', placeholder: '예) 홍길동', 'aria-label': '이름' });
-  const 줄 = 알림줄();
-  let 학번 = '', 이름 = '';
-  for (;;) {
-    const 예 = await 창('📄 1~19번 활동 정리 PDF 내려받기', h('div', { class: 'pdf-ask' },
-      h('p', {}, '학번과 이름을 넣으세요. 파일 이름과 PDF 첫 쪽에만 들어가고 이 앱에는 저장되지 않아요.'),
-      h('label', {}, '학번 ', 학번칸), h('label', {}, '이름 ', 이름칸), 줄),
-    [{ 글: '그만두기', 값: false }, { 글: '내려받기', 값: true, 주: true }]);
-    if (!예) return;
-    학번 = 학번칸.value.trim(); 이름 = 이름칸.value.trim();
-    if (학번 && 이름) break;
-    줄.틀림('학번과 이름을 모두 넣어 주세요.');
-  }
-  const 글 = 단추.textContent;
-  단추.disabled = true; 단추.textContent = '⏳ PDF 만드는 중…';
-  try {
-    const { 활동PDF } = await import('./u4-pdf.js');
-    await 활동PDF({ 학번, 이름, 파일이름: PDF파일이름(학번, 이름), 진행: (n, 모두) => { 단추.textContent = `⏳ 카드 캡처 중… (${n}/${모두})`; } });
-  } finally { 단추.disabled = false; 단추.textContent = 글; }
-}
+], { 카드: 20, 열쇠: 'u4.shot' });
 
 const u4단원 = {
   id: 'u4', 번호: 4, 색: '#3f7fd4', 갈래: '프로젝트 1-1 · 단순 선형 회귀',
@@ -1023,15 +983,7 @@ const u4단원 = {
     }, '교재 23쪽'),
 
     카드('단계 6 · 결과를 무조건 믿어도 될까?', '활동', (몸) => {
-      // 1~19번 활동을 모두 맞혔으면 활동 정리 PDF 를 받는다 — 단추 글에 지금 몇 개 끝냈는지 보이고, 이 카드 퀴즈를 맞히면 바로 바뀐다
-      const PDF단추 = h('button', { type: 'button', class: 'btn', onclick: (e) => PDF받기(e.currentTarget) });
-      const 단추갱신 = () => {
-        const 다함 = PDF활동.filter((a) => 끝났나(a.열쇠)).length;
-        PDF단추.classList.toggle('primary', 다함 === PDF활동.length);
-        if (!PDF단추.disabled) PDF단추.textContent = `📄 1~19번 활동 정리 PDF 내려받기 (${다함}/${PDF활동.length})`;
-      };
-      단추갱신();
-      채우기(몸, h('div', { class: 'two', onclick: () => setTimeout(단추갱신) },
+      채우기(몸, h('div', { class: 'two' },
         h('div', {},
           말풍선('🧑‍🎓', '채원', '결정계수가 높게 나왔으니, **나도** 일찍 자기만 하면 살이 빠지는 거지?'),
           h('div', { class: 'concept' }, md('이 데이터는 **해마다의 평균값(집단)** 이에요. 한 해의 평균 수면 시간과 그해의 비만율이 함께 움직였다는 뜻이지, **한 사람이 잠을 더 자면 살이 빠진다** 는 증거는 아니에요.'))),
@@ -1039,9 +991,12 @@ const u4단원 = {
           { 질문: '이 분석으로 말할 수 **있는** 것은?', 보기: ['연도별 평균 수면 시간과 비만율 사이에 강한 음의 상관관계가 있다', '잠을 1시간 더 자면 누구나 살이 빠진다', '수면 부족이 비만의 유일한 원인이다'], 답: 0, 해설: '집단 단위 데이터로는 상관관계까지만 말할 수 있어요.' },
           { 질문: '두 속성이 모두 「해가 갈수록」 바뀌었다면 생각해 볼 점은?', 보기: ['해가 갈수록 함께 바뀐 다른 원인(스마트폰 사용, 식습관 등)이 있을 수 있다', '아무것도 없다'], 답: 0, 해설: '숨은 원인(교란 변수)이 둘을 함께 움직였을 수 있어요. 그래서 다른 속성도 함께 봐야 해요(→ 5단원).' },
           { 질문: '결과를 더 믿을 만하게 하는 방법이 **아닌** 것은?', 보기: ['전문가 의견·논문을 찾아 견준다', '개인 단위 데이터로 다시 분석한다', '결정계수가 높으니 그대로 발표한다'], 답: 2, 해설: '도메인 지식으로 타당성을 보완하고, 다른 요인도 살펴야 해요.' },
-        ], { 열쇠: 'u4.interpret' })),
-        h('div', { class: 'row end pdf-row' }, PDF단추));
+        ], { 열쇠: 'u4.interpret' })));
     }, '교재 24~25쪽'),
+
+    // 2026-11-09 사용자 지시 — 메인 실습을 마치면 오렌지3 작업 화면을 캡처해 붙이고, 1~19번 카드 활동 정리 PDF 를 받는다(finish.js)
+    마무리카드(PDF활동, { 결과창: '산점도·모델 검증 및 평가·예측 결과 보기' }),
+
 
     카드('전문가 의견 찾아 보완하기', '활동', (몸) => {
       채우기(몸, h('div', { class: 'two' },

@@ -43,6 +43,8 @@ for (const 길 of 소스들) {
   for (const c of 코드원문) if (글.includes(c)) 잘못.push(`${이름} — 입장 코드 원문 「${c}」 가 들어 있다`);
   // ⑧ 「은(는)」 같은 조사 늘어놓기 금지 — ui.js 의 조사() 를 쓴다
   if (이름.startsWith('src/') && /[가-힣A-Za-z0-9」'"]\s?(은\(는\)|이\(가\)|을\(를\)|와\(과\))/.test(글)) 잘못.push(`${이름} — 「은(는)」 같은 조사 대신 조사() 를 쓸 것`);
+  // ⑨ html2canvas(활동 정리 PDF)가 읽지 못하는 색 함수 금지 — color-mix 하나 때문에 6단원 PDF 가 14번 카드에서 통째로 멈췄다(2026-11-09)
+  if (이름.startsWith('src/') && /color-mix\(\s*in\b|oklch\(\s*\d|\blab\(\s*\d/.test(글)) 잘못.push(`${이름} — color-mix()·oklch()·lab() 은 활동 정리 PDF(html2canvas)가 읽지 못한다. rgb·#색으로 셈해 넣을 것`);
 }
 // ⑨ 입장 코드 원문·낱말 목록이 저장소에 올라가지 않게 (사용자 지시 2026-10-22)
 const 무시 = readFileSync(join(뿌리, '.gitignore'), 'utf-8');

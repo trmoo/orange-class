@@ -4,6 +4,7 @@
  *  날씨 데이터는 연습용으로 새로 만든 값이다(src/data/weather.js). k-평균은 브라우저에서 실제로 계산한다.
  */
 import { h, s, 채우기, md, 수, 창, 조사 } from '../lib/ui.js';
+import { 다푼모습 } from '../lib/capture.js';
 import { 퀴즈, 순서, 짝짓기, 쓰기, 자기평가, 알림줄 } from '../lib/games.js';
 import { 끝냄, 끝났나, 상태, 저장, 글읽기, 글쓰기 } from '../lib/store.js';
 import { 평균, 중앙값, 사분위, 표준편차 } from '../lib/stats.js';
@@ -11,6 +12,7 @@ import { 히스토그램, 상자그림, 산점도, 막대, 색들 } from '../lib
 import { 준비, k평균, 실루엣 } from '../lib/kmeans.js';
 import { 흐름조립, 위젯창, 묶음상자, 라디오, 열고르기, 데이터표 } from '../lib/orange.js';
 import { 카드, 말풍선, 고르기단추, 교재메모 } from './common.js';
+import { 활동목록, 마무리카드 } from './finish.js';
 import { 프로젝트카드, 활동지내려받기 } from './project.js';
 import { 날씨만들기, 속성 } from '../data/weather.js';
 
@@ -136,7 +138,17 @@ export function 섞인달(k) {
 
 const 짧은속성 = ['강수량', '평균기온', '평균풍속', '일조합'];
 
-/** 군집 이름과 조사 — 군(0, '이가') → 'C1이', 군(1, '이가') → 'C2가' (숫자는 읽는 소리로 받침을 가린다) */
+/**
+ * 색을 흰색과 섞는다 — 비율 % 만큼 그 색. CSS 의 color-mix() 를 쓰지 않는 까닭: 활동 정리 PDF 를 만드는 html2canvas 가
+ * color-mix 의 계산값(color(srgb …))을 읽지 못해 14번 카드에서 PDF 만들기가 통째로 멈췄다(2026-11-09)
+ */
+const 흰색과섞기 = (색, 비율) => {
+  const p = Math.max(0, Math.min(100, 비율)) / 100;
+  const [r, g, b] = [1, 3, 5].map((i) => Math.round(parseInt(색.slice(i, i + 2), 16) * p + 255 * (1 - p)));
+  return `rgb(${r}, ${g}, ${b})`;
+};
+
+/** 군집 이름과 조사 —군(0, '이가') → 'C1이', 군(1, '이가') → 'C2가' (숫자는 읽는 소리로 받침을 가린다) */
 const 군 = (c, 짝) => `C${c + 1}${짝 ? 조사(`C${c + 1}`, 짝) : ''}`;
 
 /** 오렌지 박스플롯 한 줄에 쓰는 값 — 평균·표준편차·사분위·가장 작은/큰 값 */
@@ -184,6 +196,18 @@ function 속성뜻보기() {
     h('p', { class: 'small' }, md(`예) 첫 행 **${첫.일시}** — 강수량 ${첫.값[0] ?? '?'} · 평균기온 ${첫.값[1]}℃ · 평균풍속 ${첫.값[2]}m/s · 일조합 ${첫.값[3]}시간 → **비 없이 해가 꽤 난 추운 겨울날**`))));
 }
 const 옷들 = ['🩳 반바지', '👕 반팔', '👚 얇은 긴팔', '🧥 가디건', '🧶 니트', '🧥 코트', '🧣 패딩·목도리', '☂️ 우산', '🧢 모자', '🕶️ 선글라스', '🌬️ 바람막이', '🥾 장화'];
+
+// ── 6단원 활동 정리 PDF (2026-11-09 사용자 지시) — 1~17번 카드의 활동 + 18번 마무리 카드의 작업 화면 ──
+export const PDF활동 = 활동목록([
+  [2, 'u6.download', '기상 자료 받는 순서'], [2, 'u6.columns-pick', '자료마다 가져올 열'], [3, 'u6.flow', '위젯 흐름 만들기'],
+  [4, 'u6.missing', '데이터 살펴보기 퀴즈'], [5, 'u6.select', '쓸 속성 고르기'], [5, 'u6.target-q', 'Target 과 비지도 학습'],
+  [6, 'u6.dist', '분포 살펴보기'], [7, 'u6.range', '속성마다 범위 셈하기'], [7, 'u6.norm-why', '정규화 까닭 쓰기'], [7, 'u6.range-q', '거리를 좌우하는 속성'],
+  [8, 'u6.kmeans', '실루엣 점수 보기'], [9, 'u6.k-pick', 'k 정하기'], [9, 'u6.k-q', '실루엣 최고 k 만 정답일까'], [9, 'u6.k-why', 'k 와 그 까닭 쓰기'],
+  [10, 'u6.impute', 'Impute 위젯 자리'], [11, 'u6.count-q', '군집별 날 수'], [12, 'u6.boxplot', '속성 바꿔 상자그림 보기'],
+  [13, 'u6.box-read', '박스플롯 읽기'], [14, 'u6.month-q', '군집마다 어느 계절'], [15, 'u6.outfit', '나만의 옷차림 표'],
+  [16, 'u6.summary', '분석 결과 정리 문장'], [16, 'u6.same-temp', '(2) 기온은 비슷한데 다른 군집'], [16, 'u6.why-cluster', '(3) 좋은 점과 아쉬운 점'],
+  [17, 'u6.season', '분석해 보고 싶은 계절과 속성'], [17, 'u6.feel', '계절별 체감온도'], [17, 'u6.self', '자기평가'],
+], { 카드: 18, 열쇠: 'u6.shot' });
 
 export default {
   id: 'u6', 번호: 6, 색: '#2fa36b', 갈래: '프로젝트 2 · 군집 분석',
@@ -275,7 +299,7 @@ export default {
 
     카드('Distributions — 분포 살펴보기', '오렌지', (몸) => {
       const 일 = 날씨들();
-      let 속성번호 = 0, 구간 = 14;
+      let 속성번호 = 다푼모습('u6.dist') ? 1 : 0, 구간 = 14;   // 캡처 모드 — 끝냈으면 다른 속성(평균기온)을 본 모습
       const 그림 = h('div', {}), 설명 = h('div', {});
       const 그리기 = () => {
         const 값들 = 일.map((d) => d.값[속성번호]).filter((v) => v !== null);
@@ -292,7 +316,7 @@ export default {
       채우기(몸, h('div', { class: 'two wide-right' },
         h('div', {},
           위젯창('Distributions',
-            묶음상자('Variable', 고르기단추(짧은속성, 0, (i) => { 속성번호 = i; 그리기(); })),
+            묶음상자('Variable', 고르기단추(짧은속성, 속성번호, (i) => { 속성번호 = i; 그리기(); })),
             h('label', { class: 'slider-row' }, 'Bin width', (() => { const r = h('input', { type: 'range', min: 5, max: 30, value: 구간 }); r.addEventListener('input', () => { 구간 = Number(r.value); 그리기(); }); return r; })())),
           설명,
           h('p', { class: 'small muted' }, '💡 Distributions 에서 Fitted distribution 을 Normal 로 고르면 정규분포 곡선을 겹쳐 볼 수 있어요.')),
@@ -392,6 +416,7 @@ export default {
       };
       const 정하기 = () => { 글쓰기('u6.k', String(보기k)); 마침('u6.k-pick'); 줄.맞음(`**k = ${보기k}** 로 정했어요. 아래에 그렇게 정한 까닭을 적어 두세요.`); 그리기(); };
       그리기();
+      if (다푼모습('u6.k-pick')) 줄.맞음(`**k = ${내k()}** 로 정했어요.`);   // 캡처 모드
       채우기(몸, h('div', { class: 'two wide-left' },
         h('div', {},
           h('div', { class: 'row' }, 단추줄),
@@ -522,7 +547,7 @@ export default {
           h('table', { class: 'kv small month-grid' }, h('caption', {}, `달마다 군집별 날 수 (k = ${k})`),
             h('thead', {}, h('tr', {}, h('th', {}, ''), Array.from({ length: 12 }, (_, m) => h('th', { class: 'num' }, `${m + 1}월`)))),
             h('tbody', {}, 표.map((줄, c) => h('tr', {}, h('th', { style: { color: 색들[c] } }, `C${c + 1}`),
-              줄.map((n) => h('td', { class: 'num', style: { background: n ? `color-mix(in srgb, ${색들[c]} ${Math.round(12 + (n / 최대) * 70)}%, white)` : '' } }, n || '')))))),
+              줄.map((n) => h('td', { class: 'num', style: { background: n ? 흰색과섞기(색들[c], 12 + (n / 최대) * 70) : '' } }, n || '')))))),
           퀴즈(문항, { 열쇠: 'u6.month-q' }))));
     }, '교재 43쪽'),
 
@@ -593,6 +618,7 @@ export default {
         if (k맞음 && 온도맞음 && 옷있음) { 줄.맞음('정리 문장을 완성했어요!'); 마침('u6.summary'); }
         else 줄.틀림(!k맞음 ? `지금 정한 군집 수는 **${k}** 예요.` : c < 0 ? '군집을 하나 고르세요.' : !온도맞음 ? `${군(c, '은는')} 평균기온을 Box Plot 이나 옷차림 표 카드에서 다시 읽어 보세요.` : '어울리는 옷차림을 적어 보세요.');
       };
+      if (다푼모습('u6.summary')) 확인();   // 캡처 모드 — 맞힌 칸을 초록으로
       // 평균기온이 가장 가까운 두 군집 — (2) 를 생각할 실마리로 보여 준다
       let 짝 = null;
       for (let a = 0; a < k; a++) for (let b = a + 1; b < k; b++) { const d = Math.abs(특징[a].평[1] - 특징[b].평[1]); if (!짝 || d < 짝.d) 짝 = { a, b, d }; }
@@ -623,6 +649,9 @@ export default {
           h('p', { class: 'small muted' }, '인터넷에서 「체감온도 계산」 을 찾아 확인해 보세요. (기상청 날씨누리 등)'),
           자기평가('u6.self', '군집 분석을 이용해 날씨별 옷차림 인포그래픽을 그릴 수 있다.'))));
     }, '교재 44~45쪽'),
+
+    // 2026-11-09 사용자 지시 — 메인 실습을 마치면(내 프로젝트 앞) 오렌지3 작업 화면을 붙이고 활동 정리 PDF 를 받는다(finish.js)
+    마무리카드(PDF활동, { 결과창: 'k-Means·박스플롯' }),
 
     프로젝트카드('u6', '군집 분석', '최적의 군집 개수를 찾아보고, 성능(실루엣 계수 등)을 확인해 보세요.'),
   ],

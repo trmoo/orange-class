@@ -4,12 +4,14 @@
  *  데이터는 연습용으로 새로 만든 값이다(src/data/health.js).
  */
 import { h, 채우기, md, 수 } from '../lib/ui.js';
+import { 다푼모습 } from '../lib/capture.js';
 import { 퀴즈, 자기평가, 알림줄 } from '../lib/games.js';
 import { 끝냄 } from '../lib/store.js';
 import { 상관, 상관정도, 다중회귀, 다중예측, 성능, 나누기, 단순회귀, 난수 } from '../lib/stats.js';
 import { 산점도 } from '../lib/chart.js';
 import { 흐름조립, 위젯창, 위젯연결도, 묶음상자, 라디오, 열고르기, 데이터표 } from '../lib/orange.js';
 import { 카드, 말풍선, 슬라이더, 교재메모 } from './common.js';
+import { 활동목록, 마무리카드 } from './finish.js';
 import { 프로젝트카드 } from './project.js';
 import { 수면비만식생활, 수면열, 비만열, 결식열, 패스트열, 합치기, 수면비만, 식생활표 } from './health.js';
 
@@ -44,6 +46,15 @@ export function 다중교차검증(행, 속성들, k = 5, 씨앗 = 1) {
   }
   return 성능(Y, 예측);
 }
+
+// ── 5단원 활동 정리 PDF (2026-11-09 사용자 지시) — 1~10번 카드의 활동 + 11번 마무리 카드의 작업 화면 ──
+export const PDF활동 = 활동목록([
+  [2, 'u5.flow', '지난 흐름에 식생활 데이터 잇기'], [3, 'u5.merge', '일치하는 행 쌍만 찾기'], [3, 'u5.merge-q', '줄이 16개가 된 까닭'],
+  [4, 'u5.columns', '독립 변수 두 개 고르기'], [5, 'u5.scatter', '두 식생활 속성 산점도'], [6, 'u5.cv-q', '더 믿을 만한 점수'],
+  [7, 'u5.compare', '속성 조합 네 가지 견주기'], [7, 'u5.compare-q', '조합을 바꿔 알게 된 것'],
+  [8, 'u5.multicol', '독립 변수끼리의 상관'], [9, 'u5.predict', '두 속성으로 예측하기'], [9, 'u5.predict-q', '계수와 범위 밖 예측'],
+  [10, 'u5.interpret', '결과 해석 퀴즈'], [10, 'u5.self', '자기평가'],
+], { 카드: 11, 열쇠: 'u5.shot' });
 
 export default {
   id: 'u5', 번호: 5, 색: '#8e63c7', 갈래: '프로젝트 1-2 · 다중 선형 회귀',
@@ -202,6 +213,11 @@ export default {
           h('tbody', {}, [...기록].sort((a, b) => b[1] - a[1]).map(([k, v]) => h('tr', {}, h('td', {}, k), h('td', { class: 'num' }, 수(v, 3)))))));
         if (기록.size >= 4) 마침('u5.compare');
       };
+      // 캡처 모드 — 끝낸 학생이면 일곱 가지 조합을 모두 해 본 기록표로 그린다(기록은 남지 않으므로 다시 셈한다)
+      if (다푼모습('u5.compare')) {
+        for (const 조합 of [[수면열], [결식열], [패스트열], [수면열, 결식열], [수면열, 패스트열], [결식열, 패스트열], [수면열, 결식열, 패스트열]]) { 고른.clear(); 조합.forEach((k) => 고른.add(k)); 그리기(); }
+        고른.clear(); [결식열, 패스트열].forEach((k) => 고른.add(k));
+      }
       const 상자들 = [수면열, 결식열, 패스트열].map((k) => {
         const c = h('input', { type: 'checkbox', checked: 고른.has(k) });
         c.addEventListener('change', () => { if (c.checked) 고른.add(k); else 고른.delete(k); 그리기(); });
@@ -280,6 +296,9 @@ export default {
           ], { 열쇠: 'u5.interpret' }),
           자기평가('u5.self', '다중 선형 회귀 분석을 이용해 식생활과 비만율 사이의 선형 관계를 분석할 수 있다.'))));
     }, '교재 32~33쪽'),
+
+    // 2026-11-09 사용자 지시 — 메인 실습을 마치면(내 프로젝트 앞) 오렌지3 작업 화면을 붙이고 활동 정리 PDF 를 받는다(finish.js)
+    마무리카드(PDF활동, { 결과창: '예측 결과 보기(또는 모델 검증 및 평가)' }),
 
     프로젝트카드('u5', '회귀 분석', '회귀 분석 중 어떤 모델(단순·다중)을 썼는지 적고, 성능(결정계수 등)을 확인해 보세요.'),
   ],

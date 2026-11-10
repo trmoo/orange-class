@@ -4,11 +4,13 @@
  *  설문 데이터는 연습용으로 새로 만든 값이다(src/data/tour.js). 빈발 항목 집합·연관 규칙은 브라우저에서 실제로 계산한다.
  */
 import { h, 채우기, md, 수 } from '../lib/ui.js';
+import { 다푼모습 } from '../lib/capture.js';
 import { 퀴즈, 순서, 짝짓기, 쓰기, 자기평가, 알림줄 } from '../lib/games.js';
 import { 끝냄 } from '../lib/store.js';
 import { 빈발집합, 규칙들, 항목들 } from '../lib/assoc.js';
 import { 흐름조립, 위젯창, 묶음상자, 라디오, 열고르기, 데이터표 } from '../lib/orange.js';
 import { 카드, 말풍선, 교재메모, 슬라이더 } from './common.js';
+import { 활동목록, 마무리카드 } from './finish.js';
 import { 프로젝트카드 } from './project.js';
 import { 설문만들기, 묶음으로, 활동, 응답수 } from '../data/tour.js';
 
@@ -63,6 +65,15 @@ function 규칙표(규칙, 몇 = 8) {
       h('td', { style: { textAlign: 'left' }, title: 묶음뜻(r.A) }, r.A글), h('td', {}, '→'), h('td', { style: { textAlign: 'left' }, title: 묶음뜻(r.B) }, r.B글))))),
   h('div', { class: 'ow-table-foot' }, `Rules: ${규칙.length.toLocaleString()} (shown ${Math.min(몇, 규칙.length)}) · Lift 내림차순 · 칸에 마우스를 올리면 뜻이 보여요`));
 }
+
+// ── 7단원 활동 정리 PDF (2026-11-09 사용자 지시) — 1~13번 카드의 활동 + 14번 마무리 카드의 작업 화면 ──
+export const PDF활동 = 활동목록([
+  [2, 'u7.attrs', '두 친구의 활동 속성 찾기'], [3, 'u7.addon', 'Associate 설치 순서'], [4, 'u7.flow', '위젯 흐름 만들기'],
+  [5, 'u7.table', '설문 표 읽기'], [6, 'u7.columns', '쓸 속성만 남기기'], [7, 'u7.rows', '만족한 응답만 남기기'], [7, 'u7.rows-q', 'is at least 4 의 뜻'],
+  [8, 'u7.discretize', '숫자를 범주로 바꾸기'], [9, 'u7.stats', 'Feature Statistics 읽기'], [10, 'u7.itemsets', '최소 지지도 0.1 % 로 낮추기'],
+  [11, 'u7.rules', '폴과 제임스의 규칙 찾기'], [12, 'u7.recommend', '함께 추천할 활동'],
+  [13, 'u7.friends', '세 친구의 규칙 보기'], [13, 'u7.friend-note', '친구마다 추천 쓰기'], [13, 'u7.self', '자기평가'],
+], { 카드: 14, 열쇠: 'u7.shot' });
 
 export default {
   id: 'u7', 번호: 7, 색: '#a07040', 갈래: '프로젝트 3 · 연관 분석',
@@ -164,6 +175,7 @@ export default {
         if (속성칸.value === 'Q11' && ((조건칸.value === 'is at least' && v === 4) || (조건칸.value === 'is greater than' && v === 3))) { 줄.맞음(`만족도 4점 이상인 응답 **${고른.toLocaleString()}개** 만 남았어요.`); 마침('u7.rows'); }
         else 줄.알림('만족도(Q11)가 **4점 이상** 인 응답만 남기도록 조건을 만들어 보세요.');
       };
+      if (다푼모습('u7.rows')) { 조건칸.value = 'is at least'; 값칸.value = 4; }   // 캡처 모드 — 맞힌 조건 그대로
       [속성칸, 조건칸, 값칸].forEach((e) => e.addEventListener('input', 그리기));
       그리기();
       채우기(몸, h('div', { class: 'two' },
@@ -177,7 +189,7 @@ export default {
     }, '교재 52쪽'),
 
     카드('Discretize — 숫자를 범주로', '오렌지', (몸) => {
-      const 입력 = h('input', { type: 'text', class: 'blank', value: '', placeholder: '예) 0.0, 1.0', style: { width: '9em', textAlign: 'left' } });
+      const 입력 = h('input', { type: 'text', class: 'blank', value: 다푼모습('u7.discretize') ? '0, 1' : '', placeholder: '예) 0.0, 1.0', style: { width: '9em', textAlign: 'left' } });
       const 표자리 = h('div', {}), 줄 = 알림줄();
       const 보기값 = [5, null, 6, 6, null];
       const 그리기 = () => {
@@ -228,7 +240,7 @@ export default {
     }, '교재 53쪽'),
 
     카드('Frequent Itemsets — 자주 함께 나오는 묶음', '오렌지', (몸) => {
-      let 최소 = 1;
+      let 최소 = 다푼모습('u7.itemsets') ? 0.1 : 1;   // 캡처 모드 — 끝냈으면 0.1 % 로 낮춘 모습
       const 결과 = h('div', {});
       const 그리기 = () => {
         const 빈발 = 빈발집합(트랜잭션(), 최소 / 100);
@@ -251,7 +263,7 @@ export default {
     }, '교재 54쪽'),
 
     카드('Association Rules — 폴과 제임스의 규칙', '오렌지', (몸) => {
-      const 포함칸 = h('input', { type: 'text', class: 'blank', value: '', placeholder: 'Q8a05, Q8a06', style: { width: '10em', textAlign: 'left' } });
+      const 포함칸 = h('input', { type: 'text', class: 'blank', value: 다푼모습('u7.rules') ? 'Q8a05, Q8a06' : '', placeholder: 'Q8a05, Q8a06', style: { width: '10em', textAlign: 'left' } });
       let 최대 = 2;
       const 결과 = h('div', {}), 줄 = 알림줄();
       const 찾기 = () => {
@@ -314,6 +326,9 @@ export default {
             쓰기('u7.friend-note', { 안내: '✍️ 친구마다 추천할 활동과 그 까닭(지지도·향상도·신뢰도)을 적어 보세요.', 줄수: 5, 예시: '예) K-pop 친구 → Q8a12 뷰티/미용 (향상도 2.3, 신뢰도 0.35)' }),
             자기평가('u7.self', '연관 분석을 이용해 친구에게 여행지를 추천할 수 있다.'))));
     }, '교재 57쪽'),
+
+    // 2026-11-09 사용자 지시 — 메인 실습을 마치면(내 프로젝트 앞) 오렌지3 작업 화면을 붙이고 활동 정리 PDF 를 받는다(finish.js)
+    마무리카드(PDF활동, { 결과창: 'Frequent Itemsets·Association Rules' }),
 
     프로젝트카드('u7', '연관 분석', '내가 고른 속성과 연관된 다른 속성 사이의 지지도·신뢰도·향상도를 구하고 성능을 확인해 보세요.'),
   ],
