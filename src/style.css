@@ -99,6 +99,29 @@ b { font-weight: 800; }
 .sns-pic figcaption { margin-top: 6px; max-width: 21.6rem; text-align: center; line-height: 1.35; }
 .modal:has(.sns-big) { width: auto; }
 .sns-big { display: block; height: min(calc(100vh - 190px), 900px); width: auto; max-width: 100%; margin: 0 auto 6px; border-radius: 10px; }
+/* 6단원 단계 2 — 메타 정보 팝업 (그림 왼쪽 · 설명 오른쪽) */
+.modal:has(.meta-pop) { width: min(980px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; }
+.meta-pop { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 18px; align-items: start; }
+.meta-pop figure { margin: 0; }
+.meta-pop figcaption { margin-top: 6px; max-width: 30rem; line-height: 1.4; }
+.meta-pop p, .meta-pop ul { margin: 0 0 8px; }
+/* 엑셀 모양 표 — 회색 머리글(열 글자·행 번호), 1~11행 메타 정보는 붉게, 12행부터 데이터는 초록으로 */
+.xl-sheet { border-collapse: collapse; font-size: .8rem; line-height: 1.25; background: #fff; font-family: inherit; }
+.xl-sheet th, .xl-sheet td { border: 1px solid #d4d4d4; padding: 2px 8px; height: 1.35rem; white-space: nowrap; text-align: left; font-weight: 400; }
+.xl-sheet thead th { background: #eef0f2; color: #555; text-align: center; min-width: 4.6rem; }
+.xl-sheet thead th.xl-corner { min-width: 0; width: 2rem; }
+.xl-sheet .xl-no { background: #eef0f2; color: #555; text-align: center; width: 2rem; padding: 2px 4px; }
+.xl-sheet .xl-meta td { background: #fdf0ef; color: #5a3a37; }
+.xl-sheet .xl-meta .xl-no { background: #f6d3cf; color: #b3261e; font-weight: 700; }
+.xl-sheet .xl-head td { background: #eaf6ee; font-weight: 700; }
+.xl-sheet .xl-num { text-align: right; }
+.xl-sheet .xl-spill { overflow: visible; }
+.xl-sheet thead th.xl-ann-head, .xl-sheet td.xl-ann { border: none; background: none; }
+.xl-sheet td.xl-ann { vertical-align: middle; text-align: left; white-space: normal; min-width: 5.6rem; padding: 0 0 0 10px; font-size: .85rem; line-height: 1.35; }
+.xl-sheet td.xl-ann b { font-size: .95rem; }
+.xl-sheet td.xl-ann.del { color: #b3261e; box-shadow: inset 3px 0 0 #d93a2b; }
+.xl-sheet td.xl-ann.keep { color: #1f7a45; box-shadow: inset 3px 0 0 #2fa36b; }
+@media (max-width: 900px) { .meta-pop { grid-template-columns: 1fr; } .meta-pop figure { overflow-x: auto; } }
 @media (max-width: 900px) { .story3 { grid-template-columns: 1fr; } .sns-pic-btn { margin: 0 auto; } .sns-pic-btn img { height: auto; width: min(100%, 360px); } .sns-pic figcaption { margin-inline: auto; } }
 .lead { font-size: 1.12rem; margin: 2px 0 8px; }
 .box { background: #fffaf3; border: 1.5px solid var(--line); border-radius: 14px; padding: 10px 16px; }
