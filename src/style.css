@@ -170,6 +170,8 @@ button.qdot:hover { outline: 3px solid var(--green-soft); }
 button.qdot.on:hover { outline-color: #f5c08a; }
 .quiz-end { margin-top: 8px; }
 .quiz-q { font-size: 1.12rem; margin: 6px 0 10px; }
+/* 카드의 (1)·(2) 활동에 이어지는 문항 — (1) 의 글씨(write-label)와 같은 크기·굵기로 */
+.quiz-q.as-step { font-size: 1rem; font-weight: 700; margin: 10px 0 6px; }
 .choices { display: flex; flex-direction: column; gap: 8px; }
 .choices.grid2 { display: grid; grid-template-columns: 1fr 1fr; }
 .choices.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); }
@@ -281,8 +283,14 @@ button.qdot.on:hover { outline-color: #f5c08a; }
 @keyframes pop { from { transform: scale(.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 .ow-node-icon { font-size: 22px; }
 .ow-node-name { font-size: 13px; font-weight: 700; fill: #333; }
-.selcols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-.selcols .selcol-box:first-child { grid-column: 1 / -1; }
+/* 실제 오렌지 Select Columns 처럼 — 왼쪽 Ignored 가 세 줄을 모두 차지하고, 오른쪽에 Features · Target · Metas 를 위에서부터 쌓는다 */
+.selcols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: 1fr auto auto; gap: 6px; }
+.selcols .selcol-box[data-box="Ignored"] { grid-column: 1; grid-row: 1 / span 3; }
+.selcols .selcol-box[data-box="Features"] { grid-column: 2; grid-row: 1; }
+.selcols .selcol-box[data-box="Target"] { grid-column: 2; grid-row: 2; }
+.selcols .selcol-box[data-box="Metas"] { grid-column: 2; grid-row: 3; }
+/* 오른쪽에 상자가 셋 쌓여 키가 커지므로, 보통 한두 개만 들어가는 Target·Metas 는 조금 낮게 (1280×720 카드에 맞춤) */
+.selcols .selcol-box[data-box="Target"], .selcols .selcol-box[data-box="Metas"] { min-height: 46px; }
 .selcol-box { border: 1px solid #bbb; background: #fff; border-radius: 6px; min-height: 60px; padding: 3px 6px; }
 .selcol-box.ready { border: 2px solid var(--blue); background: var(--blue-soft); cursor: pointer; }
 .selcol-title { font-weight: 800; font-size: .85rem; border-bottom: 1px solid #ddd; margin-bottom: 4px; }
@@ -354,6 +362,25 @@ code { background: #f3eee8; border-radius: 5px; padding: 1px 6px; font-family: C
 .proj-tabs { margin: 6px 0 10px; }
 .proj-tabs button { font-size: .88rem; padding: 6px 10px; }
 .sil-table td { padding: 1px 8px; }
+/* 6단원 k-Means — 한국어판 오렌지 「k평균군집화」 창 (왼쪽 설정 · 오른쪽 실루엣 점수 목록) */
+.km-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 14.2rem); gap: 10px; align-items: stretch; }
+.km-grid > .ow-box legend { white-space: nowrap; }
+.km-grid > .ow-box { margin: 3px 0; display: flex; flex-direction: column; }
+.km-line { display: flex; align-items: center; gap: 6px; margin: 3px 0; flex-wrap: wrap; }
+.km-line .ow-radio { min-width: 6.2rem; }
+.km-grid .ow-spin { width: 3.1rem; }   /* 「시작 (From) [2] 끝 (To) [8]」 이 한 줄에 들도록 */
+.km-label { min-width: 6.2rem; }
+.km-apply { display: flex; align-items: center; gap: 8px; margin: 6px 0 2px; }
+.km-apply input { accent-color: var(--blue); width: 17px; height: 17px; }
+.km-apply .ow-btn { flex: 1; cursor: default; color: #8a8a8a; font-weight: 400; }
+.km-sil { flex: 1; display: flex; flex-direction: column; background: #fff; border: 1px solid #c4c4c4; }
+.km-row { display: grid; grid-template-columns: 1.7rem 1fr; align-items: stretch; padding: 0; border: none; border-bottom: 1px solid #eee; background: #fff; font: inherit; text-align: left; cursor: pointer; }
+.km-row .km-k { background: #f3f3f3; border-right: 1px solid #ddd; display: grid; place-items: center; color: #444; }
+.km-row .km-score { display: flex; flex-direction: column; gap: 2px; padding: 3px 8px; font-variant-numeric: tabular-nums; }
+.km-bar { display: block; height: 4px; border-radius: 2px; background: #22d3e6; }
+.km-row:hover .km-score { background: #e5f1fb; }
+.km-row.on .km-score { background: #0078d7; color: #fff; }
+.km-row.on .km-bar { background: #8ff0fa; }
 .silbar { display: block; height: 14px; border-radius: 4px; }
 .outfit-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; }
 .outfit-card { border: 2.5px solid; border-radius: 14px; padding: 0 10px 8px; background: #fff; overflow: hidden; }
@@ -451,6 +478,8 @@ code { background: #f3eee8; border-radius: 5px; padding: 1px 6px; font-family: C
 .fig-cap.ratio-note { color: #8a5200; }
 /* 쓰기 칸 아래 예시 답안 — 5글자 이상 쓰면 보인다 */
 .answer-box { margin: 4px 0 0; padding: 5px 12px; font-weight: 600; font-size: .92rem; }
+/* 6단원 「왜 정규화할까?」 — 왼쪽 칸이 꽉 차서 모범답안을 조금 촘촘하게 (1280×720 에 세 줄) */
+.norm-why .answer-box { font-size: .86rem; line-height: 1.4; padding: 4px 10px; }
 /* 단원 마무리 카드 — 오렌지3 작업 화면 붙여 넣기 + 활동 정리 PDF (2026-11-09) */
 .finish-q { display: flex; gap: 8px; align-items: baseline; margin: 0 0 8px; font-weight: 700; font-size: 1.05rem; }
 .finish-no { flex: none; background: var(--brand-soft); color: var(--brand-deep); border-radius: 8px; padding: 0 9px; font-weight: 800; }

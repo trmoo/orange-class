@@ -44,11 +44,14 @@ npm start            # 개발 서버 (index.html)
 npm test             # 계산·데이터·입장 코드 시험
 npm run check:syntax # 소스 전수 문법·저작권 검사
 npm run build        # dist/index.html 한 파일로 빌드 + 점검
-npm run csv          # data/ 의 csv 두 개를 앱 안(src/data/csv.js)으로 옮겨 적기
+npm run csv          # data/ 의 csv 세 개를 앱 안(src/data/csv.js)으로 옮겨 적기
+npm run seoul        # 6단원 실제 날씨와 오렌지 k평균군집화 결과를 src/data/seoul2024.js 로 (python·scikit-learn)
 ```
 
-앱 안에서 그래프·계산에 쓰는 데이터는 모두 **연습용으로 새로 만든 값**입니다(실제 통계 아님).
+4·5·7단원 앱 안에서 그래프·계산에 쓰는 데이터는 **연습용으로 새로 만든 값**입니다(실제 통계 아님).
 단, 4단원에서 내려받는 csv 두 개(`data/`)는 서울열린데이터광장의 **실제 통계**를 머리글만 한 줄로 정리한 것입니다.
+6단원은 기상청 기상자료개방포털의 서울 2024년 **실제 관측값**(`2024_서울_날씨_정리데이터.csv`, 내려받기도 됨)으로 그리고,
+군집 결과는 오렌지 3.40 k평균군집화와 같은 계산으로 미리 셈해 두어 학생의 오렌지 화면과 같습니다(`npm run seoul`, 파이썬·scikit-learn 필요).
 6단원 첫 카드의 「기온별 옷차림 표」 그림(`src/assets/outfit-chart.jpg`)은 인터넷에 널리 도는 그림으로,
 만든 사람을 확인하지 못했습니다(이 앱이 만든 것이 아닙니다).
 자세한 내용은 `LICENSE`.

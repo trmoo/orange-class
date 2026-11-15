@@ -13,7 +13,8 @@
     "test": "node test/run.mjs",
     "check:syntax": "node tools/check-syntax.mjs",
     "codes": "node tools/make_codes.mjs",
-    "csv": "node tools/make_csv.mjs"
+    "csv": "node tools/make_csv.mjs",
+    "seoul": "python tools/make_seoul2024.py"
   },
   "devDependencies": {
     "vite": "^8.3.4",

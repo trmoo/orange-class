@@ -40,11 +40,15 @@ export function 알림줄() {
  * 마지막 문항까지 맞히면 처음으로 되돌아가지 않고 그 자리에 「모두 맞혔어요」 를 띄운다.
  * 다 푼 뒤에는 위쪽 점을 눌러 앞 문항의 해설을 다시 볼 수 있다.
  * 이미 끝낸 퀴즈 카드에 다시 오면 다 푼 모습(마지막 문항)으로 그린다.
+ * 번호: 「Q1.」 대신 쓸 머리 글자(예: '(2)') — 카드의 (1)·(2) 활동에 이어지는 한 문항일 때 쓴다.
+ *       번호를 주면 질문을 (1) 의 글씨(write-label)처럼 그리고, 한 문항뿐이면 진행 점도 그리지 않는다.
  */
-export function 퀴즈(문항들, { 열쇠, 제목 } = {}) {
+export function 퀴즈(문항들, { 열쇠, 제목, 번호 } = {}) {
+  const 머리 = (i) => (번호 ? `${번호} ` : `Q${i + 1}. `);
+  const 질문칸 = 번호 ? 'quiz-q as-step' : 'quiz-q';
   // 캡처 모드(활동 정리 PDF)에서 끝낸 퀴즈는 모든 문항을 정답·해설과 함께 한꺼번에 보인다 — 복습용
   if (다푼모습(열쇠)) return h('div', { class: 'quiz quiz-all' }, 제목 ? h('b', {}, 제목) : null, 문항들.map((q, i) => h('div', { class: 'quiz-done' },
-    h('p', { class: 'quiz-q' }, h('b', {}, `Q${i + 1}. `), md(q.질문)),
+    h('p', { class: 질문칸 }, h('b', {}, 머리(i)), md(q.질문)),
     h('div', { class: 'choice ok' }, '✔ ', md(q.보기[q.답])),
     q.해설 ? h('p', { class: 'small muted quiz-why' }, md(q.해설)) : null)));
   const 끝 = 문항들.length - 1;
@@ -94,9 +98,10 @@ export function 퀴즈(문항들, { 열쇠, 제목 } = {}) {
         : h('span', { class: 이름 });
     };
     채우기(상자,
-      h('div', { class: 'quiz-head' }, 제목 ? h('b', {}, 제목) : null,
-        h('span', { class: 'quiz-dots' }, 문항들.map(점))),
-      h('p', { class: 'quiz-q' }, h('b', {}, `Q${지금 + 1}. `), md(q.질문)),
+      번호 && 문항들.length === 1 && !제목 ? null
+        : h('div', { class: 'quiz-head' }, 제목 ? h('b', {}, 제목) : null,
+          h('span', { class: 'quiz-dots' }, 문항들.map(점))),
+      h('p', { class: 질문칸 }, h('b', {}, 머리(지금)), md(q.질문)),
       보기묶음, 줄, 아래);
   }
   그리기();
@@ -230,10 +235,10 @@ export function 빈칸(칸들, { 열쇠, 힌트 } = {}) {
 }
 
 /** 글쓰기 칸 — 쓰는 대로 이 브라우저에 저장된다 */
-export function 쓰기(열쇠, { 안내 = '', 줄수 = 3, 예시 = '', 답안 = '', 답안글자 = 5 } = {}) {
+export function 쓰기(열쇠, { 안내 = '', 줄수 = 3, 예시 = '', 답안 = '', 답안글자 = 5, 답안제목 = '💡 예시 답안 — ' } = {}) {
   const 칸 = h('textarea', { class: 'write', rows: 줄수, placeholder: 예시 || '여기에 적어 보세요.', 'aria-label': 안내 || '글쓰기' });
   // 답안: 띄어쓰기를 빼고 답안글자 이상 쓰면 칸 아래에 예시 답안을 보여 준다(먼저 스스로 써 보게)
-  const 답칸 = 답안 ? h('div', { class: 'feedback info answer-box' }, '💡 예시 답안 — ', md(답안)) : null;
+  const 답칸 = 답안 ? h('div', { class: 'feedback info answer-box' }, 답안제목, md(답안)) : null;
   const 답보기 = () => { if (답칸) 답칸.style.display = 칸.value.replace(/\s/g, '').length >= 답안글자 ? '' : 'none'; };
   칸.value = 글읽기(열쇠);
   답보기();
