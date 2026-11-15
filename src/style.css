@@ -91,6 +91,15 @@ b { font-weight: 800; }
 .three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .four { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 @media (max-width: 900px) { .two, .two.wide-left, .two.wide-right { grid-template-columns: 1fr; } .three, .four { grid-template-columns: 1fr 1fr; } }
+/* 6단원 첫 카드 — 말풍선 · 재원이가 SNS 에서 본 그림 · 프로젝트의 길. 그림은 카드 높이에 맞춰 키를 정한다 */
+.story3 { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 18px; align-items: start; }
+.sns-pic { margin: 0; }
+.sns-pic-btn { display: block; padding: 0; border: 1.5px solid var(--line); border-radius: 14px; overflow: hidden; background: #f6f6f6; cursor: zoom-in; }
+.sns-pic-btn img { display: block; height: 25.5rem; width: auto; }
+.sns-pic figcaption { margin-top: 6px; max-width: 21.6rem; text-align: center; line-height: 1.35; }
+.modal:has(.sns-big) { width: auto; }
+.sns-big { display: block; height: min(calc(100vh - 190px), 900px); width: auto; max-width: 100%; margin: 0 auto 6px; border-radius: 10px; }
+@media (max-width: 900px) { .story3 { grid-template-columns: 1fr; } .sns-pic-btn { margin: 0 auto; } .sns-pic-btn img { height: auto; width: min(100%, 360px); } .sns-pic figcaption { margin-inline: auto; } }
 .lead { font-size: 1.12rem; margin: 2px 0 8px; }
 .box { background: #fffaf3; border: 1.5px solid var(--line); border-radius: 14px; padding: 10px 16px; }
 .box h3 { margin: 0 0 6px; font-size: 1.05rem; }
