@@ -28,6 +28,9 @@ b { font-weight: 800; }
 .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
 .btn.primary:hover:not(:disabled) { background: var(--brand-deep); }
 .btn.small { padding: 4px 12px; font-size: .88rem; }
+/* 초록 단추 — 눈에 잘 띄어야 하는 내려받기 등 (6단원 단계 2 의 정리 데이터 csv) */
+.btn.green { background: var(--green); border-color: var(--green); color: #fff; box-shadow: 0 2px 6px rgba(19, 128, 90, .3); }
+.btn.green:hover:not(:disabled) { background: #0e6447; border-color: #0e6447; }
 .btn.ghost { background: transparent; }
 .btn:disabled { opacity: .4; cursor: default; }
 .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 8px 0; }

@@ -333,7 +333,7 @@ export default {
           // 정리를 마친 실제 관측값 — 직접 받기 어려울 때 이 파일로 오렌지 실습을 시작한다.
           // ⚠ 1280×720 에서 왼쪽 순서 맞추기를 다 풀면 왼쪽 칸이 꽉 차므로 이 칸에 한 줄 단추로 둔다
           h('div', { class: 'row' },
-            h('button', { type: 'button', class: 'btn small', onclick: 날씨csv내려받기, title: `${날씨csv.이름} 내려받기` }, '📥 정리를 마친 파일 내려받기'),
+            h('button', { type: 'button', class: 'btn small green', onclick: 날씨csv내려받기, title: `${날씨csv.이름} 내려받기` }, '📥 정리를 마친 파일 내려받기'),
             h('span', { class: 'small muted' }, 날씨csv.이름)),
           h('p', { class: 'muted small' }, md(`위 네 열을 모은 **실제 관측값**(서울 2024년 ${날씨csv.줄}일, 출처: 기상청 기상자료개방포털)이에요. 이 단원의 그래프·군집도 이 파일로 그렸어요.`)))));
     }, '교재 37~38쪽'),
@@ -435,11 +435,11 @@ export default {
       // 정규화 까닭 쓰기의 모범답안 — 띄어쓰기 빼고 10글자 이상 쓰면 칸 아래에 보인다(2026-11-15 사용자 지시).
       // 숫자는 어림해 적는다 — 옆 (1) 의 범위 정답(Max. − Min.)을 그대로 알려 주지 않게
       const 단위of = (t) => 단위[통계.indexOf(t)];
-      const 나머지 = 통계.filter((t) => t !== 넓은).map((t) => t.짧은).join('·');
+      // 학생이 학습지에 적는 말투로(2026-11-16 사용자 지시) — 굵은 글씨 없이 「~다」 로 끝내고, 칸의 예시 틀(○○ 은 범위가 …인데 …)을 따른다
       // ⚠ 1280×720 에서 왼쪽 칸에 세 줄까지만 들어간다 — 길게 늘리면 카드가 넘친다
-      const 모범답안 = `**${넓은.짧은}**${조사(넓은.짧은, '은는')} 범위가 약 ${Math.round(범위(넓은) / 10) * 10} ${단위of(넓은)}, **${좁은.짧은}**${조사(좁은.짧은, '은는')} 약 ${Math.round(범위(좁은))} ${단위of(좁은)}라 `
-        + `${Math.floor(범위(넓은) / 범위(좁은) / 10) * 10}배 넘게 차이 나요. 정규화하지 않으면 ${넓은.짧은}${조사(넓은.짧은, '이가')} 거리를 거의 다 차지해 `
-        + `${나머지}${조사(나머지, '은는')} 군집을 나누는 데 힘을 못 써요.`;
+      const 모범답안 = `${넓은.짧은}${조사(넓은.짧은, '은는')} 범위가 약 ${Math.round(범위(넓은) / 10) * 10}${단위of(넓은)}인데 ${좁은.짧은}${조사(좁은.짧은, '은는')} 약 ${Math.round(범위(좁은))}${단위of(좁은)}밖에 안 돼서 `
+        + `${Math.floor(범위(넓은) / 범위(좁은) / 10) * 10}배 넘게 차이가 난다. 그래서 정규화하지 않으면 거리를 잴 때 ${넓은.짧은} 차이가 거의 다 차지해서 `
+        + '나머지 속성들은 군집을 나누는 데 별 영향을 못 준다.';
       const 통계창 = 위젯창({ 이름: 'Column Statistics', 제목: '열별 통계량 (Column Statistics)', 작게: true },
         h('div', { class: 'ow-table-wrap' }, h('table', { class: 'ow-table' },
           h('thead', {}, h('tr', {}, ['열', '평균', '중앙값', 'Min.', 'Max.', 'Missing'].map((t) => h('th', {}, t)))),
@@ -680,7 +680,7 @@ export default {
       // 옷차림 단계는 평균기온의 단계와 한 단계까지 달라도 받는다(사람마다 느끼는 온도가 다르다)
       const 단계맞나 = (f) => { const v = Number(표[열('s', f.c)]); return v > 0 && Math.abs(v - 단계찾기(f.평[1])) <= 1; };
       const 다됐나 = () => {
-        if (특징.every((g) => (표[열('o', g.c)] || []).length && 단계맞나(g))) { 줄.맞음('모든 군집에 옷차림 단계와 옷을 정했어요! 인쇄하거나 화면을 캡처해 친구와 나눠 보세요.'); 마침('u6.outfit'); }
+        if (특징.every((g) => (표[열('o', g.c)] || []).length && 단계맞나(g))) { 줄.맞음('모든 군집에 옷차림 단계와 옷을 정했어요! 화면을 캡처해 친구와 나눠 보세요.'); 마침('u6.outfit'); }
       };
       const 칸들 = 특징.map((f) => {
         const 이름칸 = h('input', { type: 'text', class: 'blank', style: { width: '100%', textAlign: 'left' }, value: 표[열('n', f.c)] || '', placeholder: '군집 이름 (예: 쌀쌀한 바람)', 'aria-label': `C${f.c + 1} 이름` });
@@ -715,8 +715,7 @@ export default {
       채우기(몸,
         h('div', { class: 'row' },
           h('p', { class: 'small grow' }, md(`군집마다(k = ${k}) 날씨를 보고 **이름을 붙이고, 옷차림 단계와 옷을 골라** 나만의 옷차림 표를 완성하세요. 햇빛이 적은(흐리거나 비 오는) 군집엔 ☂️ 우산, 햇빛이 강한 군집엔 🧢 모자·🕶️ 선글라스를 더해요.`)),
-          h('button', { type: 'button', class: 'btn small', onclick: 옷차림표보기 }, '🌡️ 기온별 옷차림 표'),
-          h('button', { type: 'button', class: 'btn small', onclick: () => window.print() }, '🖨️ 인쇄')),
+          h('button', { type: 'button', class: 'btn small', onclick: 옷차림표보기 }, '🌡️ 기온별 옷차림 표')),
         h('div', { class: 'outfit-grid one-row' }, 칸들), 줄);
     }, '교재 43~45쪽'),
 
