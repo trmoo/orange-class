@@ -292,13 +292,27 @@ export function 열고르기(속성들, 답, { 열쇠, 처음 = {} } = {}) {
  * 데이터 표 (오렌지 Data Table 모양). 빈칸(null)은 '?' 로 보인다.
  * 열: 속성 이름 목록, 행: 값 배열의 배열. 메타: 메타 속성 열 번호 목록(회색으로)
  */
-export function 데이터표(열, 행, { 최대행 = 8, 메타 = [], 대상 = [], 강조행 = [], 설명 } = {}) {
-  const 보일행 = 행.slice(0, 최대행);
-  return h('div', { class: 'ow-table-wrap' },
+/**
+ * 오렌지 데이터 테이블 흉내.
+ *  · 스크롤: true 면 모든 줄을 그리고 상자 안에서 내려 보게 한다(최대행은 무시).
+ *  · 머리누름(j): 주면 열 이름이 단추가 된다 — 오렌지처럼 누르면 그 열로 정렬하고, 다시 누르면 반대 순서(정렬은 부르는 쪽이 한다).
+ *    정렬열·정렬방향(1 오름 · -1 내림)을 주면 그 열 이름 옆에 ▲/▼ 를 그린다.
+ *  · 줄번호: 줄마다 왼쪽에 적을 번호(정렬해도 원래 번호가 따라가게). 없으면 1, 2, 3 …
+ */
+export function 데이터표(열, 행, { 최대행 = 8, 메타 = [], 대상 = [], 강조행 = [], 설명, 스크롤 = false, 머리누름 = null, 정렬열 = null, 정렬방향 = 1, 줄번호 = null } = {}) {
+  const 보일행 = 스크롤 ? 행 : 행.slice(0, 최대행);
+  const 머리 = (c, j) => {
+    const 칸 = 메타.includes(j) ? 'meta' : 대상.includes(j) ? 'target' : '';
+    if (!머리누름) return h('th', { class: 칸 }, c);
+    const 지금 = 정렬열 === j;
+    return h('th', { class: `${칸} sortable${지금 ? ' sorted' : ''}`, 'aria-sort': 지금 ? (정렬방향 > 0 ? 'ascending' : 'descending') : 'none' },
+      h('button', { type: 'button', class: 'th-btn', title: '누르면 이 열로 정렬 · 한 번 더 누르면 반대 순서', onclick: () => 머리누름(j) }, c, 지금 ? (정렬방향 > 0 ? ' ▲' : ' ▼') : ''));
+  };
+  return h('div', { class: `ow-table-wrap${스크롤 ? ' scroll' : ''}` },
     h('table', { class: 'ow-table' },
-      h('thead', {}, h('tr', {}, h('th', {}, ''), 열.map((c, j) => h('th', { class: 메타.includes(j) ? 'meta' : 대상.includes(j) ? 'target' : '' }, c)))),
-      h('tbody', {}, 보일행.map((r, i) => h('tr', { class: 강조행.includes(i) ? 'hl' : '' }, h('td', { class: 'rowno' }, i + 1),
+      h('thead', {}, h('tr', {}, h('th', {}, ''), 열.map(머리))),
+      h('tbody', {}, 보일행.map((r, i) => h('tr', { class: 강조행.includes(i) ? 'hl' : '' }, h('td', { class: 'rowno' }, 줄번호 ? 줄번호[i] : i + 1),
         r.map((v, j) => h('td', { class: `${메타.includes(j) ? 'meta' : 대상.includes(j) ? 'target' : ''}${v === null || v === undefined ? ' missing' : ''}` }, v === null || v === undefined ? '?' : v)))))),
     h('div', { class: 'ow-table-foot' }, 설명 || `${행.length.toLocaleString()} instances · ${열.length - 메타.length} features${메타.length ? ` · ${메타.length} meta` : ''}`,
-      행.length > 최대행 ? ` (앞 ${최대행}줄만 보임)` : ''));
+      !스크롤 && 행.length > 최대행 ? ` (앞 ${최대행}줄만 보임)` : ''));
 }

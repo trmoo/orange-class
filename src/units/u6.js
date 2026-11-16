@@ -6,14 +6,15 @@
  */
 import { h, s, 채우기, md, 수, 창, 조사 } from '../lib/ui.js';
 import { 다푼모습 } from '../lib/capture.js';
-import { 퀴즈, 순서, 짝짓기, 쓰기, 자기평가, 알림줄 } from '../lib/games.js';
+import { 퀴즈, 순서, 짝짓기, 쓰기, 알림줄 } from '../lib/games.js';
 import { 끝냄, 끝났나, 상태, 저장, 글읽기, 글쓰기 } from '../lib/store.js';
 import { 평균, 중앙값, 사분위, 표준편차 } from '../lib/stats.js';
-import { 히스토그램, 상자그림, 산점도, 막대, 색들 } from '../lib/chart.js';
+import { 히스토그램, 산점도, 막대, 색들 } from '../lib/chart.js';
 import { 흐름조립, 위젯창, 묶음상자, 라디오, 열고르기, 데이터표 } from '../lib/orange.js';
+import { 준비, 실루엣 } from '../lib/kmeans.js';
 import { 카드, 말풍선, 고르기단추, 교재메모 } from './common.js';
 import { 활동목록, 마무리카드 } from './finish.js';
-import { 프로젝트카드, 활동지내려받기 } from './project.js';
+import { 프로젝트카드 } from './project.js';
 import { 날들 as 서울날들, 속성, 오렌지군집 } from '../data/seoul2024.js';
 import { 날씨csv } from '../data/csv.js';
 
@@ -158,31 +159,6 @@ const 옷차림표보기 = () => 창('🌡️ 기온별 옷차림 표', h('div',
  */
 export const 옷열쇠 = (k, 종류, c) => (k === 가장좋은k() ? `${종류}${c}` : `k${k}${종류}${c}`);
 
-/** 6단원 활동지 — 이 단원에서 적은 것(정규화 까닭·k 와 까닭·군집별 옷차림 표·정리 문장·생각)을 한 장에 담는다 */
-function 활동지6() {
-  const k = 내k(), 특징 = 군집특징(k), 표 = 상태.notes['u6.outfit'] || {};
-  const 옷줄 = 특징.map((f) => {
-    const 이름 = (표[옷열쇠(k, 'n', f.c)] || '').trim(), 단계 = 표[옷열쇠(k, 's', f.c)], 옷 = (표[옷열쇠(k, 'o', f.c)] || []).join(', ');
-    return `C${f.c + 1} (${f.수}일 · 평균기온 ${수(f.평[1], 1)}℃) — ${이름 || '(이름 없음)'} · ${단계 ? `${단계}단계` : '(단계 없음)'} · ${옷 || '(옷 없음)'}`;
-  }).join('\n');
-  const c = 글읽기('u6.sum-c');
-  const 빈 = '(   )', 값 = (v) => String(v).trim() || 빈;
-  const 정리 = ['u6.sum-k', 'u6.sum-t', 'u6.sum-o'].some((열) => 글읽기(열).trim()) || c !== ''
-    ? `날씨 ${날씨들().length}일을 k-평균 군집화로 묶었더니 ${값(글읽기('u6.sum-k'))}개의 군집으로 나뉘었다. 그중 ${c === '' ? 빈 : `C${Number(c) + 1}`} 군집은 평균기온이 약 ${값(글읽기('u6.sum-t'))}℃이므로 ${값(글읽기('u6.sum-o'))} 차림이 좋다.` : '';
-  return 활동지내려받기({
-    탭제목: '날씨와 옷차림 활동지', 제목: '날씨와 옷차림 — 6단원 활동지', 파일이름: '6단원_날씨와옷차림',
-    칸들: [
-      { 제목: '1. 정규화가 필요한 까닭', 물음: '속성마다 값의 범위를 근거로, 거리를 재기 전에 정규화해야 하는 까닭', 답: 글읽기('u6.norm-why') },
-      { 제목: `2. 고른 군집 수 (k = ${k}) 와 그 까닭`, 답: 글읽기('u6.k-why') },
-      { 제목: '3. 군집별 이름 · 옷차림 단계 · 옷', 답: 옷줄 },
-      { 제목: '4. 분석 결과 정리', 답: 정리 },
-      { 제목: '5. 평균기온은 비슷한데 옷차림이 다른 군집', 물음: '기온 말고 어떤 속성 때문인가?', 답: 글읽기('u6.same-temp') },
-      { 제목: '6. 군집 분석으로 옷차림을 정할 때 좋은 점과 아쉬운 점', 답: 글읽기('u6.why-cluster') },
-      { 제목: '7. 자기평가', 물음: '군집 분석을 이용해 날씨별 옷차림 인포그래픽을 그릴 수 있다.', 답: 글읽기('u6.self'), 빈글: '(아직 고르지 않음)' },
-    ],
-  });
-}
-
 /** 계절 — 3~5월 봄 · 6~8월 여름 · 9~11월 가을 · 12~2월 겨울 */
 const 계절들 = ['봄', '여름', '가을', '겨울'];
 const 계절 = (달) => (달 >= 3 && 달 <= 5 ? 0 : 달 >= 6 && 달 <= 8 ? 1 : 달 >= 9 && 달 <= 11 ? 2 : 3);
@@ -250,6 +226,76 @@ function 오렌지상자(v, 이름) {
     눈금.map((t) => s('text', { x: x(t), y: 140, 'text-anchor': 'middle', class: 'ob-num' }, String(t))));
 }
 
+/** 눈금 간격을 1·2·2.5·5 × 10ⁿ 가운데 알맞은 것으로 고른다 */
+function 좋은간격(대략) {
+  const 자리 = 10 ** Math.floor(Math.log10(대략 || 1));
+  return [1, 2, 2.5, 5, 10].map((m) => m * 자리).find((d) => d >= 대략) || 10 * 자리;
+}
+
+/**
+ * 오렌지 3.40 박스플롯처럼 여러 줄을 한 그림에 — 줄마다 점선(가장 작은~큰 값) · 파란 상자(사분위) ·
+ * 진한 파란 선(평균 ± 표준편차) · 노란 선(중앙값).
+ *  · 이름표(Annotate): 켜면 위에 「C1: 평균 ± 표준편차」, 아래에 사분위·중앙값 숫자를 적는다(끄면 이름만).
+ *  · 비교: '평균' · '중앙값' 이면 줄마다 그 값 자리에 세로선을 위아래로 그어 줄끼리 견주게 한다. '없음' 이면 긋지 않는다.
+ * 줄들: [{ 이름, 색, 값들 }] — 값이 없는 줄은 「값 없음」 만 적는다.
+ */
+function 오렌지상자들(줄들, { 이름표 = true, 비교 = '평균', 변수이름 = '' } = {}) {
+  const 너비 = 600, 왼 = 22, 오른 = 너비 - 22, 위 = 6;
+  const 촘촘 = 줄들.length > 5;
+  const 줄높이 = 이름표 ? (촘촘 ? 48 : 58) : (촘촘 ? 34 : 42), 상자 = 촘촘 ? 14 : 20;
+  const 읽음 = 줄들.map((z) => ({ ...z, v: z.값들.length ? 상자읽기(z.값들) : null }));
+  const 끝값 = 읽음.filter((z) => z.v).flatMap((z) => [z.v.최소, z.v.최대]);
+  const 간격 = 좋은간격(((Math.max(...끝값) - Math.min(...끝값)) || 1) / 7);
+  const lo = Math.floor(Math.min(...끝값) / 간격) * 간격, hi = Math.ceil(Math.max(...끝값) / 간격) * 간격;
+  const x = (t) => 왼 + ((t - lo) / (hi - lo || 1)) * (오른 - 왼);
+  const 바닥 = 위 + 읽음.length * 줄높이 + 4, 높이 = 바닥 + 40;
+  const 자릿수 = 간격 < 1 ? 2 : 1;
+  const 가운데 = (i) => 위 + i * 줄높이 + (이름표 ? 18 : 12) + 상자 / 2;
+  const 눈금 = [];
+  for (let t = lo; t <= hi + 간격 / 2; t += 간격) 눈금.push(+t.toFixed(4));
+  const 비교선 = 비교 === '없음' ? [] : 읽음.filter((z) => z.v).map((z) => s('line', {
+    x1: x(비교 === '평균' ? z.v.평균 : z.v.중앙), x2: x(비교 === '평균' ? z.v.평균 : z.v.중앙), y1: 위, y2: 바닥,
+    stroke: z.색 || '#1010b0', 'stroke-width': 1.2, 'stroke-opacity': 0.7, 'stroke-dasharray': 비교 === '평균' ? '' : '4 3' }));
+  return s('svg', { viewBox: `0 0 ${너비} ${높이}`, class: 'orange-box bp-plot', role: 'img', 'aria-label': `${변수이름} 박스플롯` },
+    비교선,
+    읽음.map((z, i) => {
+      const y = 가운데(i), 반 = 상자 / 2;
+      const 이름글 = s('tspan', { fill: z.색 || '#5a2bd6' }, z.이름);
+      if (!z.v) return s('text', { x: 왼, y: y + 4, class: 'ob-num' }, 이름글, '  (값 없음)');
+      const v = z.v;
+      // Annotate — 아래 숫자는 서로 가까우면(28px 안) 겹치지 않게 사분위 쪽을 뺀다
+      const 아래숫자 = !이름표 ? [] : [[v.q1, -6, 'end'], [v.중앙, 0, 'middle'], [v.q3, 6, 'start']]
+        .filter(([t], j) => j === 1 || Math.abs(x(t) - x(v.중앙)) >= 28)
+        .map(([t, 밀기, 맞춤]) => s('text', { x: x(t) + 밀기, y: y + 반 + 13, 'text-anchor': 맞춤, class: 'ob-num' }, 수(t, 자릿수)));
+      return s('g', {},
+        s('text', { x: 이름표 ? Math.min(Math.max(x(v.평균), 70), 너비 - 70) : 왼, y: y - 반 - 5, 'text-anchor': 이름표 ? 'middle' : 'start', class: 'ob-label' },
+          이름글, 이름표 ? `: ${수(v.평균, 3)} ± ${수(v.표준편차, 2)}` : ''),
+        s('line', { x1: x(v.최소), x2: x(v.최대), y1: y, y2: y, stroke: '#3333cc', 'stroke-width': 1.5, 'stroke-dasharray': '2 3' }),
+        s('rect', { x: x(v.q1), y: y - 반, width: Math.max(2, x(v.q3) - x(v.q1)), height: 상자, fill: '#6aa6f8' }),
+        s('line', { x1: x(v.평균 - v.표준편차), x2: x(v.평균 + v.표준편차), y1: y, y2: y, stroke: '#1010b0', 'stroke-width': 2.5 }),
+        s('line', { x1: x(v.평균), x2: x(v.평균), y1: y - 반, y2: y + 반, stroke: '#1010b0', 'stroke-width': 2.5 }),
+        s('line', { x1: x(v.중앙), x2: x(v.중앙), y1: y - 반, y2: y + 반, stroke: '#f2cf1d', 'stroke-width': 3 }),
+        아래숫자);
+    }),
+    s('line', { x1: 왼, x2: 오른, y1: 바닥, y2: 바닥, stroke: '#888', 'stroke-width': 1.5 }),
+    눈금.map((t) => s('text', { x: x(t), y: 바닥 + 16, 'text-anchor': 'middle', class: 'ob-num' }, String(t))),
+    s('text', { x: 너비 / 2, y: 바닥 + 34, 'text-anchor': 'middle', class: 'ob-num' }, 변수이름));
+}
+
+/**
+ * 날마다의 실루엣 — 오렌지 k평균군집화가 내보내는 「실루엣 (Silhouette)」 열과 같은 값.
+ * 오렌지는 실루엣 s 를 그대로 내보내지 않고 arctan(s)/π + 0.5 로 바꿔 0~1 사이에 둔다(owkmeans.py).
+ * 정규화하고 빈칸을 평균으로 채운 표 위에서 잰다(오렌지와 같은 차례). k 마다 한 번만 셈한다.
+ */
+const 실루엣기억 = new Map();
+export function 날마다실루엣(k) {
+  if (!실루엣기억.has(k)) {
+    const { 행들 } = 준비(날씨들().map((d) => d.값), true);
+    실루엣기억.set(k, 실루엣(행들, 군집(k).군집).값.map((v) => Math.atan(v) / Math.PI + 0.5));
+  }
+  return 실루엣기억.get(k);
+}
+
 /** 열별 통계량(Column Statistics) 창의 값 — 빈칸(?)은 빼고 센다 */
 export const 속성통계 = () => 속성.map((이름, j) => {
   const 일 = 날씨들(), v = 일.map((d) => d.값[j]).filter((x) => x !== null);
@@ -279,10 +325,9 @@ export const PDF활동 = 활동목록([
   [6, 'u6.dist', '분포 살펴보기'], [7, 'u6.range', '속성마다 범위 셈하기'], [7, 'u6.norm-why', '정규화 까닭 쓰기'], [7, 'u6.range-q', '거리를 좌우하는 속성'],
   [8, 'u6.kmeans', '실루엣 점수 보기'], [9, 'u6.k-pick', 'k 정하기'], [9, 'u6.k-q', '실루엣 최고 k 만 정답일까'], [9, 'u6.k-why', 'k 와 그 까닭 쓰기'],
   [10, 'u6.impute', 'Impute 위젯 자리'], [11, 'u6.count-q', '군집별 날 수'], [12, 'u6.boxplot', '속성 바꿔 상자그림 보기'],
-  [13, 'u6.box-read', '박스플롯 읽기'], [14, 'u6.month-q', '군집마다 어느 계절'], [15, 'u6.outfit', '나만의 옷차림 표'],
-  [16, 'u6.summary', '분석 결과 정리 문장'], [16, 'u6.same-temp', '(2) 기온은 비슷한데 다른 군집'], [16, 'u6.why-cluster', '(3) 좋은 점과 아쉬운 점'],
-  [17, 'u6.season', '분석해 보고 싶은 계절과 속성'], [17, 'u6.feel', '계절별 체감온도'], [17, 'u6.self', '자기평가'],
-], { 카드: 18, 열쇠: 'u6.shot' });
+  [13, 'u6.box-read', '박스플롯 읽기'], [14, 'u6.month-q', '군집마다 어느 계절'], [15, 'u6.fill', '군집별 날 수·평균 채우기'], [16, 'u6.outfit', '나만의 옷차림 표'],
+  [17, 'u6.summary', '분석 결과 정리 문장'], [17, 'u6.same-temp', '(2) 기온은 비슷한데 다른 군집'], [17, 'u6.why-cluster', '(3) 좋은 점과 아쉬운 점'],
+], { 카드: 18, 열쇠: 'u6.shot' });   // 2026-11-16 — 15번 빈칸 채우기를 넣고 옛 17번(체감온도) 카드를 뺐다
 
 export default {
   id: 'u6', 번호: 6, 색: '#2fa36b', 갈래: '프로젝트 2 · 군집 분석',
@@ -566,7 +611,12 @@ export default {
       const 크기 = Array.from({ length: k }, (_, c) => r.군집.filter((g) => g === c).length);
       const 큰 = 크기.indexOf(Math.max(...크기));
       const 그림 = 산점도(일.map((d, i) => ({ x: d.값[1], y: d.값[3], 색: 색들[r.군집[i]], 제목: `${d.일시} · C${r.군집[i] + 1}` })), { x이름: 속성[1], y이름: 속성[3], 너비: 560, 높이: 280, 반지름: 3.5 }).svg;
-      const 막대들 = 막대(크기.map((n, c) => ({ 이름: `C${c + 1}`, 값: n, 색: 색들[c] })), { y이름: '날 수', 너비: 560, 높이: 190 }).svg;
+      // 높이 176 — 옮겨 온 데이터 분포 팁까지 1280×720 카드에 들게(190 이면 퀴즈를 푼 뒤 2px 넘쳤다)
+      const 막대들 = 막대(크기.map((n, c) => ({ 이름: `C${c + 1}`, 값: n, 색: 색들[c] })), { y이름: '날 수', 너비: 560, 높이: 176 }).svg;
+      // 데이터 분포의 Split by·Show probabilities 팁 (2026-11-16 박스플롯 카드에서 옮겨 옴) — 바람 센 날이 한 군집에 모여 있으면 그 군집을 적는다
+      const 센날 = 일.map((d, i) => [d.값[2], r.군집[i]]).filter(([w]) => w !== null && w >= 5);
+      const 센군 = new Set(센날.map(([, c]) => c));
+      const 센예 = 센날.length && 센군.size === 1 ? `「5m/s 이상인 ${센날.length}일은 모두 ${군([...센군][0])}」` : '「5m/s 이상인 날은 어느 군집인지」';
       채우기(몸, h('div', { class: 'two' },
         h('div', {},
           위젯창({ 이름: 'Scatter Plot', 제목: '산점도 (Scatter Plot)', 작게: true },
@@ -581,28 +631,68 @@ export default {
           퀴즈([
             { 질문: '막대의 높이(날 수)를 모두 더하면?', 보기: [`${일.length}`, `${k}`, '100'], 답: 0,
               해설: `하루는 꼭 한 군집에만 들어가니 모두 더하면 ${일.length}일이에요. 가장 많은 것은 ${군(큰)} (${크기[큰]}일) — 오렌지는 막대에 마우스를 올리면 수를 보여 줘요.` },
-          ], { 열쇠: 'u6.count-q' }))));
+          ], { 열쇠: 'u6.count-q' }),
+          h('p', { class: 'small muted' }, md(`💡 변수 **평균풍속** · Split by **군집 (Cluster)** · Show probabilities 를 켜면 ${센예} 같은 비율도 보여요.`)))));
     }, '교재 41~43쪽'),
 
+    // 한국어판 오렌지 3.40 「박스플롯」 창 (2026-11-16 사용자가 보낸 화면대로) — 변수 선택 · 하위 그룹 · 표시(Annotate · 비교)
     카드('Box Plot — 군집마다 어떤 날씨일까?', '오렌지', (몸) => {
       const k = 내k();
       const r = 군집(k), 일 = 날씨들();
-      let 속성번호 = 1;
-      const 그림 = h('div', {});
+      // 변수 목록 — 오렌지처럼 메타(일시 · 군집 · 실루엣) 다음에 속성 넷. 일시·군집은 이 카드에서 고르지 않는다
+      const 변수들 = [
+        { 이름: '일시', 종류: 't', 끔: true },
+        { 이름: '군집 (Cluster)', 종류: 'c', 끔: true },
+        { 이름: '실루엣 (Silhouette)', 종류: 'n', 값: (i) => 날마다실루엣(k)[i] },
+        ...속성.map((이름, j) => ({ 이름, 종류: 'n', 값: (i) => 일[i].값[j] })),
+      ];
+      const 하위들 = [{ 이름: '없음', 종류: '' }, { 이름: '군집 (Cluster)', 종류: 'c' }];
+      const 기본 = 변수들.findIndex((v) => v.이름 === 속성[1]);   // 평균기온
+      let 고른 = 기본, 나눔 = 1, 이름표 = true, 비교 = '평균';
+      const 그림 = h('div', {}), 설명 = h('p', { class: 'small muted bp-note' });
       const 그리기 = () => {
-        // 오렌지 박스플롯처럼 빈칸(?)은 빼고 그린다 — 강수량은 비 온 날만 남는다
-        채우기(그림, 상자그림(Array.from({ length: k }, (_, c) => ({ 이름: `C${c + 1}`, 값들: 일.filter((d, i) => r.군집[i] === c && d.값[속성번호] !== null).map((d) => d.값[속성번호]), 색: 색들[c] })), { x이름: `${속성[속성번호]}${속성번호 === 0 ? ' (빈칸 ? 은 빼고 — 비 온 날만)' : ''}`, 너비: 560, 줄높이: k > 5 ? 26 : 34 }).svg);
-        if (속성번호 !== 1) 마침('u6.boxplot');
+        const v = 변수들[고른], 날 = 일.map((_, i) => i);
+        const 값있음 = (i) => v.값(i) !== null && v.값(i) !== undefined;   // 오렌지처럼 빈칸(?)은 빼고 그린다
+        const 줄들 = 나눔
+          ? Array.from({ length: k }, (_, c) => ({ 이름: `C${c + 1}`, 색: 색들[c], 값들: 날.filter((i) => r.군집[i] === c && 값있음(i)).map((i) => v.값(i)) }))
+          : [{ 이름: '전체', 색: '#5a2bd6', 값들: 날.filter(값있음).map((i) => v.값(i)) }];
+        채우기(그림, 오렌지상자들(줄들, { 이름표, 비교, 변수이름: v.이름 }));
+        const 비교글 = { 평균: '세로선 = 줄마다 **평균** 자리(평균 비교)', 중앙값: '점선 = 줄마다 **중앙값** 자리(중앙값 비교)', 없음: '비교 안 함 — 세로선 없이 상자만' }[비교];
+        const 덧글 = v.이름 === 속성[0] ? ' · 강수량은 빈칸(비 안 온 날)을 빼고 그려 **비 온 날만** 남아요.'
+          : v.이름.startsWith('실루엣') ? ' · 실루엣은 오렌지가 0~1 로 바꾼 값이에요(0.5 보다 크면 제 군집에 잘 들어간 날).' : '';
+        채우기(설명, md(비교글 + 덧글));
+        if (고른 !== 기본) 마침('u6.boxplot');
       };
+      // 오렌지 목록 상자 — 누르면 그 줄이 파랗게 골라진다(고를 수 없는 줄은 흐리게)
+      const 목록 = (항목들, 지금, 바꿈) => h('div', { class: 'bp-list', role: 'listbox' }, 항목들.map((v, i) => h('button', {
+        type: 'button', class: `bp-item${i === 지금 ? ' on' : ''}`, disabled: v.끔 || null, role: 'option', 'aria-selected': String(i === 지금),
+        title: v.끔 ? '이 카드에서는 고르지 않아요' : null,
+        onclick: (e) => {
+          바꿈(i);
+          e.currentTarget.parentElement.querySelectorAll('.bp-item').forEach((b, j) => { b.classList.toggle('on', j === i); b.setAttribute('aria-selected', String(j === i)); });
+          그리기();
+        },
+      }, v.종류 ? h('span', { class: `ow-type ${v.종류}` }, { t: 'T', c: 'C', n: 'N' }[v.종류]) : null, ` ${v.이름}`)));
+      const 찾기칸 = (이름) => h('input', { type: 'text', class: 'ow-filter', placeholder: 'Filter...', disabled: true, 'aria-label': 이름 });
+      const 정렬칸 = (글) => h('label', { class: 'ow-radio off bp-sort' }, h('input', { type: 'checkbox', disabled: true }), ` ${글}`);
+      const 주석상자 = h('input', { type: 'checkbox', checked: true });
+      주석상자.addEventListener('change', () => { 이름표 = 주석상자.checked; 그리기(); });
+      const 창 = 위젯창({ 이름: 'Box Plot', 제목: '박스플롯', 작게: true },
+        묶음상자('변수 선택 (Variable)', 찾기칸('변수 찾기'), 목록(변수들, 고른, (i) => { 고른 = i; }), 정렬칸('하위 그룹과의 관련성 순으로 정렬')),
+        묶음상자('하위 그룹 (Subgroups)', 찾기칸('하위 그룹 찾기'), 목록(하위들, 나눔, (i) => { 나눔 = i; }), 정렬칸('변수와의 관련성 순으로 정렬')),
+        묶음상자('표시', h('label', { class: 'ow-radio' }, 주석상자, ' Annotate'),
+          라디오('bp-compare', ['비교 안 함', '중앙값 비교', '평균 비교'], 2, (i) => { 비교 = ['없음', '중앙값', '평균'][i]; 그리기(); })),
+        h('div', { class: 'ow-foot' }, h('span', { class: 'ow-count' }, `⇥ ${일.length}`)));
       그리기();
       const 특징 = 군집특징(k);
-      채우기(몸, h('div', { class: 'two wide-left' },
-        h('div', {}, 위젯창('Box Plot', 묶음상자('Variable', 고르기단추(짧은속성, 1, (i) => { 속성번호 = i; 그리기(); })), h('div', { class: 'small' }, 'Subgroups: ', h('b', {}, 'Cluster'))), 그림),
+      채우기(몸, h('div', { class: 'bp-grid' },
+        창,
+        h('div', {}, 그림, 설명),
         h('div', {},
           h('p', { class: 'small' }, md('속성을 바꿔 가며 군집마다 상자가 어디 있는지 보세요. 전체 평균보다 높으면 ↑, 낮으면 ↓ 로 정리했어요.')),
-          h('table', { class: 'kv small' }, h('thead', {}, h('tr', {}, h('th', {}, ''), 짧은속성.map((t) => h('th', { class: 'center' }, t)), h('th', {}, '많은 달'))),
-            h('tbody', {}, 특징.map((f) => h('tr', {}, h('th', { style: { color: 색들[f.c] } }, `C${f.c + 1}`), f.화살.map((a) => h('td', { class: 'center' }, a)), h('td', { class: 'small' }, f.많은달))))),
-          h('p', { class: 'small muted' }, '💡 Distributions 위젯의 Split by 에 Cluster 를 고르고 Show probabilities 를 켜면, 「5m/s 이상인 날은 모두 어느 군집인지」 같은 비율도 볼 수 있어요.'))));
+          // 세 칸 배치의 좁은 오른쪽 칸에 들도록 머리글을 두 글자로 줄인다
+          h('table', { class: 'kv small' }, h('thead', {}, h('tr', {}, h('th', {}, ''), ['강수', '기온', '풍속', '일조'].map((t) => h('th', { class: 'center' }, t)), h('th', {}, '많은 달'))),
+            h('tbody', {}, 특징.map((f) => h('tr', {}, h('th', { style: { color: 색들[f.c] } }, `C${f.c + 1}`), f.화살.map((a) => h('td', { class: 'center' }, a)), h('td', { class: 'small' }, f.많은달))))))));
     }, '교재 41~43쪽'),
 
     // 오렌지 박스플롯은 상자그림 모양이 교과서 그림과 조금 다르다 — 평균 ± 표준편차 막대와 중앙값 선을 함께 그린다
@@ -638,12 +728,27 @@ export default {
     // k-Means 뒤에 데이터 테이블을 이으면 맨 앞에 군집 (Cluster) 열이 붙는다 — 군집마다 어느 달이 많은지 보면 계절이 드러난다
     카드('군집마다 어느 날짜일까?', '오렌지', (몸) => {
       const k = 내k(), r = 군집(k), 일 = 날씨들(), 표 = 달별군집(k), 특징 = 군집특징(k);
-      let 정렬 = false;
+      // 오렌지 데이터 테이블처럼 — 열 이름을 누르면 그 열로 정렬, 한 번 더 누르면 반대 순서, 「원래 순서로 복원」 으로 날짜 순서(2026-11-16 사용자 지시)
+      // 열 차례는 오렌지 출력과 같다 — 메타(일시 · 군집 · 실루엣) 다음에 속성 넷
+      const 열이름들 = ['일시', '군집 (Cluster)', '실루엣 (Silhouette)', ...속성];
+      const 실 = 날마다실루엣(k);
+      let 정렬열 = null, 방향 = 1;
       const 표자리 = h('div', {});
-      const 줄들 = 일.map((d, i) => ({ c: r.군집[i], d }));
+      const 줄들 = 일.map((d, i) => ({ i, c: r.군집[i], d }));
+      // 열마다 정렬 열쇠 — 군집은 번호(C1, C2 …), 일시는 날짜 글자, 나머지는 값. 빈칸(?)은 어느 방향이든 맨 아래
+      const 열쇠 = (z, j) => (j === 0 ? z.d.일시 : j === 1 ? z.c : j === 2 ? 실[z.i] : z.d.값[j - 3]);
       const 표그리기 = () => {
-        const 차례 = 정렬 ? [...줄들].sort((a, b) => a.c - b.c || a.d.일시.localeCompare(b.d.일시)) : 줄들;
-        채우기(표자리, 데이터표(['군집 (Cluster)', '일시', ...짧은속성], 차례.map(({ c, d }) => [`C${c + 1}`, d.일시, ...d.값]), { 최대행: 7, 메타: [1], 설명: `${일.length}행 · 군집 (Cluster) 열이 맨 앞에 붙었어요${정렬 ? ' · 군집별로 정렬함' : ''}` }));
+        const 차례 = 정렬열 === null ? 줄들 : [...줄들].sort((a, b) => {
+          const x = 열쇠(a, 정렬열), y = 열쇠(b, 정렬열);
+          if (x === null || y === null) return x === y ? a.i - b.i : x === null ? 1 : -1;
+          const 차 = typeof x === 'string' ? x.localeCompare(y) : x - y;
+          return 차 * 방향 || a.i - b.i;   // 같은 값끼리는 원래(날짜) 순서
+        });
+        // 머리글은 「군집 (Cluster)」·「실루엣 (Silhouette)」 만 두 줄로 꺾어 표가 칸 안에 들게 한다
+        채우기(표자리, 데이터표(열이름들.map((t) => t.replace(' (', '\n(')), 차례.map(({ i, c, d }) => [d.일시, `C${c + 1}`, 수(실[i], 3), ...d.값]), {
+          스크롤: true, 메타: [0, 1, 2], 줄번호: 차례.map((z) => z.i + 1), 정렬열, 정렬방향: 방향,
+          머리누름: (j) => { if (정렬열 === j) 방향 = -방향; else { 정렬열 = j; 방향 = 1; } 표그리기(); },
+          설명: `${일.length} instances · 4 features · 3 meta${정렬열 === null ? '' : ` · ${열이름들[정렬열]} ${방향 > 0 ? '오름차순' : '내림차순'}`}` }));
       };
       표그리기();
       // 군집마다 한 계절이 가장 뚜렷한 군집을 하나 골라 묻는다
@@ -657,12 +762,14 @@ export default {
           해설: `${짧은속성[j]} 평균이 ${수(가.평[j], 1)}${단위} 와 ${수(나.평[j], 1)}${단위} 로 크게 달라요. 같은 달이라도 다른 속성으로 갈려요.` });
       }
       const 최대 = Math.max(...표.flat());
-      채우기(몸, h('div', { class: 'two' },
+      채우기(몸, h('div', { class: 'two wide-left' },
         h('div', {},
           위젯창({ 이름: 'Data Table', 제목: '데이터 테이블 (Data Table) (2)', 작게: true },
-            h('div', { class: 'ow-line' }, h('button', { type: 'button', class: 'ow-btn', onclick: () => { 정렬 = !정렬; 표그리기(); } }, '⇅ 군집 (Cluster) 열 이름 누르기')),
-            표자리),
-          h('p', { class: 'small muted' }, md('오렌지에서도 **군집 (Cluster)** 열 이름을 누르면 군집별로 정렬돼요. 군집마다 어떤 **일시** 가 들어 있는지 보면 계절이 보여요.'))),
+            표자리,
+            h('div', { class: 'ow-line' }, h('button', { type: 'button', class: 'ow-btn restore', onclick: () => { 정렬열 = null; 방향 = 1; 표그리기(); } }, '원래 순서로 복원 (Restore Original Order)'))),
+          h('ul', { class: 'small dt-how' },
+            h('li', {}, md('표 위쪽의 **군집 (Cluster)** 열 이름을 누르면 C1, C2, … 순서로 정렬돼요. 한 번 더 누르면 반대 순서로 바뀌어요. 다른 열(일시·강수량 …)도 이름을 누르면 그 열로 정렬돼요. 원래 날짜 순서로 돌아가려면 **원래 순서로 복원 (Restore Original Order)** 을 눌러요.')),
+            h('li', {}, md('같은 군집끼리 모인 행을 내려 보면서 **날짜(일시)가 어느 달에 많은지**, 속성마다 군집별로 어떻게 다른지 확인해요. 박스플롯에서 본 군집의 특징과 맞는지도 살펴보세요.')))),
         h('div', {},
           h('table', { class: 'kv small month-grid' }, h('caption', {}, `달마다 군집별 날 수 (k = ${k})`),
             h('thead', {}, h('tr', {}, h('th', {}, ''), Array.from({ length: 12 }, (_, m) => h('th', { class: 'num' }, `${m + 1}월`)))),
@@ -670,6 +777,70 @@ export default {
               줄.map((n) => h('td', { class: 'num', style: { background: n ? 흰색과섞기(색들[c], 12 + (n / 최대) * 70) : '' } }, n || '')))))),
           퀴즈(문항, { 열쇠: 'u6.month-q' }))));
     }, '교재 43쪽'),
+
+    // 14번과 옷차림 표 사이 빈칸 채우기 (2026-11-16 사용자 지시) — 군집마다 날 수·평균을 오렌지 위젯에서 찾아 적는다.
+    // 다 비우지 않는다 — 줄마다 숫자 칸 하나만 돌아가며 비워(C1 날 수 · C2 기온 · C3 풍속 · C4 일조 · C5 날 수 …)
+    // 데이터 분포와 박스플롯 세 변수를 골고루 열어 보게 하고, 설명 칸은 줄을 걸러 비운다(나머지 줄은 화살표로 만든 예시 문장).
+    카드('군집마다 날 수와 평균 채우기', '활동', (몸) => {
+      const k = 내k(), 특징 = 군집특징(k);
+      const 표 = (상태.notes['u6.fill'] ||= {});
+      const 열쇠 = (c, 열) => `${k}:${c}:${열}`;   // k 를 바꾸면 군집이 통째로 달라지므로 k 마다 따로 둔다
+      // 숫자 칸 넷 — 날 수(데이터 분포의 막대) · 평균(박스플롯 Annotate 「C1: 평균 ± 표준편차」 의 앞 수)
+      const 열들 = [
+        { 이름: '날 수', 출처: '데이터 분포', 값: (f) => f.수, 허용: 0 },
+        { 이름: '평균기온', 출처: '평균 (℃) · 박스플롯', 값: (f) => f.평[1], 허용: 0.051 },
+        { 이름: '평균풍속', 출처: '평균 (m/s) · 박스플롯', 값: (f) => f.평[2], 허용: 0.051 },
+        { 이름: '일조합', 출처: '평균 (hr) · 박스플롯', 값: (f) => f.평[3], 허용: 0.051 },
+      ];
+      // 예시 문장 — 군집 특징 화살표(전체 평균보다 ↑·↓)로 학생이 쓸 법한 말을 만든다
+      const 날씨말 = (f) => {
+        const [비, 기온, 바람, 해] = f.화살, t = f.평[1], 조각 = [];
+        if (비 === '↑') 조각.push(['비가 많이 오고', '비가 많이 오는']);
+        조각.push(기온 === '↑' ? (t >= 23 ? ['덥고', '더운'] : ['따뜻하고', '따뜻한']) : 기온 === '↓' ? (t <= 5 ? ['춥고', '추운'] : ['쌀쌀하고', '쌀쌀한']) : ['선선하고', '선선한']);
+        if (바람 === '↑') 조각.push(['바람이 세고', '바람이 센']); else if (바람 === '↓') 조각.push(['바람이 약하고', '바람이 약한']);
+        if (해 === '↑') 조각.push(['맑고', '맑은']); else if (해 === '↓') 조각.push(['흐리고', '흐린']);
+        return `${조각.map((p, i) => p[i === 조각.length - 1 ? 1 : 0]).join(' ')} 날`;
+      };
+      const 줄 = 알림줄(), 칸들 = [];
+      const 합칸 = h('td', { class: 'num' });
+      // 날 수 합계 — 채워 둔 칸과 학생이 적은 칸을 더한다(다 맞으면 366)
+      const 합계 = () => { 합칸.textContent = `${특징.reduce((합, f) => 합 + (f.c % 4 === 0 ? (Number(표[열쇠(f.c, 0)]) || 0) : f.수), 0)}일`; };
+      const 행들 = 특징.map((f) => {
+        const 빈열 = f.c % 4, 설명빈 = f.c % 2 === 1;
+        const 숫자칸 = 열들.map((열, j) => {
+          if (j !== 빈열) return h('td', { class: 'num fill-given' }, j === 0 ? `${f.수}일` : 수(열.값(f), 1));
+          const 칸 = h('input', { type: 'text', class: 'blank fill-in', inputmode: 'decimal', value: 표[열쇠(f.c, j)] ?? '', 'aria-label': `C${f.c + 1} ${열.이름}` });
+          칸.addEventListener('input', () => { 표[열쇠(f.c, j)] = 칸.value; 저장(); 합계(); });
+          칸들.push({ 칸, 맞나: () => 칸.value.trim() !== '' && Math.abs(Number(칸.value) - 열.값(f)) <= 열.허용 });   // Number('') 은 0 — 빈칸을 먼저 거른다
+          return h('td', { class: 'num' }, 칸, j === 0 ? ' 일' : '');
+        });
+        let 설명칸 = h('td', { class: 'fill-given' }, 날씨말(f));
+        if (설명빈) {
+          const 칸 = h('input', { type: 'text', class: 'blank fill-desc', value: 표[열쇠(f.c, 'd')] ?? '', placeholder: '기온·바람·햇빛은 어떤가요?', 'aria-label': `C${f.c + 1} 어떤 날씨인가요` });
+          칸.addEventListener('input', () => { 표[열쇠(f.c, 'd')] = 칸.value; 저장(); });
+          칸들.push({ 칸, 맞나: () => 칸.value.replace(/\s/g, '').length >= 4 });
+          설명칸 = h('td', {}, 칸);
+        }
+        return h('tr', {}, h('th', {}, h('span', { class: 'fill-c', style: { background: 색들[f.c] } }, `C${f.c + 1}`)), 숫자칸, 설명칸);
+      });
+      const 확인 = () => {
+        let 맞음 = 0;
+        for (const z of 칸들) { const ok = z.맞나(); z.칸.classList.toggle('ok', ok); z.칸.classList.toggle('bad', !ok); if (ok) 맞음++; }
+        if (맞음 === 칸들.length) { 줄.맞음(`모두 채웠어요! 날 수를 다 더하면 **${날씨들().length}일** 이에요.`); 마침('u6.fill'); }
+        else 줄.틀림(`${칸들.length}칸 중 ${맞음}칸 맞았어요. 날 수는 **데이터 분포**(변수 선택: 군집) 막대, 평균은 **박스플롯**(하위 그룹: 군집 · Annotate)의 「C1: 평균 ± …」 앞 수예요. 소수 첫째 자리까지만 적어도 돼요.`);
+      };
+      합계();
+      if (다푼모습('u6.fill')) 확인();   // 캡처 모드 — 맞힌 칸을 초록으로
+      채우기(몸,
+        h('p', { class: 'write-label' }, md(`**(1)** 군집마다(k = ${k}) 묶인 **날 수와 평균** 을 오렌지에서 찾아 빈칸을 채우고, 그 군집이 **어떤 날씨인지** 설명해 보세요. 채워진 칸은 내 오렌지 화면과 맞춰 보는 데 쓰세요.`)),
+        h('table', { class: 'kv small fill-table' },
+          h('thead', {}, h('tr', {}, h('th', {}, '군집'),
+            열들.map((열) => h('th', { class: 'center' }, 열.이름, h('br'), h('small', {}, 열.출처))),
+            h('th', {}, '어떤 날씨인가요?', h('br'), h('small', {}, '기온은 높은지 낮은지, 바람·햇빛은 어떤지')))),
+          h('tbody', {}, 행들,
+            h('tr', { class: 'fill-total' }, h('th', {}, '합계'), 합칸, h('td', { colspan: 4 }, h('small', {}, `날 수를 모두 더하면 ${날씨들().length}일이 되어야 해요.`))))),
+        h('div', { class: 'row check' }, h('button', { type: 'button', class: 'btn primary', onclick: 확인 }, '정답 확인'), 줄));
+    }, '교재 41~43쪽'),
 
     카드('나만의 옷차림 표 만들기', '활동', (몸) => {
       const k = 내k();
@@ -749,24 +920,7 @@ export default {
           쓰기('u6.same-temp', { 안내: `**(2)** 평균기온은 비슷한데 옷차림·준비물을 다르게 정한 군집이 있나요? 기온 말고 어떤 속성 때문인가요?`, 줄수: 2,
             예시: 짝 ? `실마리) ${군(짝.a, '과와')} ${군(짝.b)}의 평균기온은 ${수(특징[짝.a].평[1], 1)}℃·${수(특징[짝.b].평[1], 1)}℃ 예요.` : '' })),
         h('div', {},
-          쓰기('u6.why-cluster', { 안내: '**(3)** 기온만 보고 옷을 고를 때와 비교해, 군집 분석으로 옷차림을 정하면 무엇이 좋은가요? 아쉬운 점이나 더 넣고 싶은 데이터(체감온도·미세먼지·다른 해의 날씨 등)도 적어 보세요.', 줄수: 5 }),
-          h('div', { class: 'tip' }, md('💡 활동지에는 이 단원에서 적은 **정규화 까닭 · 고른 k 와 까닭 · 군집별 옷차림 표 · 정리 문장 · (2)·(3)** 이 함께 담겨요.')),
-          h('div', { class: 'row end' }, h('button', { type: 'button', class: 'btn', onclick: 활동지6 }, '💾 활동지 내려받기 (HTML)')))));
-    }, '교재 44~45쪽'),
-
-    카드('계절마다 체감온도가 다르다', '활동', (몸) => {
-      채우기(몸, h('div', { class: 'two' },
-        h('div', {},
-          말풍선('👦', '재원', '같은 10℃ 라도 바람 부는 날은 훨씬 춥고, 여름엔 습하면 더 덥더라. **강설량·습도·일교차** 도 넣어 볼까?'),
-          h('div', { class: 'concept' }, md('**체감온도** 는 기온만이 아니라 사람이 실제로 느끼는 더위·추위를 나타내요. 우리나라는 계절마다 차이가 커서 계절별로 따로 분석해 볼 만해요.')),
-          쓰기('u6.season', { 안내: '✍️ 내가 분석해 보고 싶은 계절과, 그때 넣을 속성은?', 줄수: 3, 예시: '예) 겨울 — 평균기온, 평균풍속, 최저기온, 적설' })),
-        h('div', {},
-          짝짓기([
-            { 왼: '☀️ 여름(하절기) 체감온도에 함께 쓰는 것', 답: '기온과 습도' },
-            { 왼: '❄️ 겨울(동절기) 체감온도에 함께 쓰는 것', 답: '기온과 풍속' },
-          ], ['기온과 습도', '기온과 풍속', '기온과 강수량'], { 열쇠: 'u6.feel' }),
-          h('p', { class: 'small muted' }, '인터넷에서 「체감온도 계산」 을 찾아 확인해 보세요. (기상청 날씨누리 등)'),
-          자기평가('u6.self', '군집 분석을 이용해 날씨별 옷차림 인포그래픽을 그릴 수 있다.'))));
+          쓰기('u6.why-cluster', { 안내: '**(3)** 기온만 보고 옷을 고를 때와 비교해, 군집 분석으로 옷차림을 정하면 무엇이 좋은가요? 아쉬운 점이나 더 넣고 싶은 데이터(체감온도·미세먼지·다른 해의 날씨 등)도 적어 보세요.', 줄수: 5 }))));
     }, '교재 44~45쪽'),
 
     // 2026-11-09 사용자 지시 — 메인 실습을 마치면(내 프로젝트 앞) 오렌지3 작업 화면을 붙이고 활동 정리 PDF 를 받는다(finish.js)
