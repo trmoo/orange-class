@@ -7,6 +7,7 @@
 import { h, 채우기, md, 창 } from '../lib/ui.js';
 import { 쓰기, 체크 } from '../lib/games.js';
 import { 상태 } from '../lib/store.js';
+import { 캡처 } from '../lib/capture.js';
 import { 카드 } from './common.js';
 import { 여섯단계 } from './u3.js';
 
@@ -23,7 +24,8 @@ const 체크들 = [
  * 분석: '회귀 분석' | '군집 분석' | '연관 분석'
  * 물음: 6단계 각각의 질문(분석마다 5단계 질문이 다르다)
  */
-export function 프로젝트카드(단원, 분석, 다섯째물음) {
+// 내려받기단추: false 면 맨 아래 [💾 활동지 내려받기 (HTML)] 을 그리지 않는다(6단원 — 2026-11-17 사용자 지시)
+export function 프로젝트카드(단원, 분석, 다섯째물음, { 내려받기단추 = true } = {}) {
   const 물음 = [
     `${분석}으로 일상의 어떤 문제를 해결하고 싶은지 적어 보세요.`,
     '어떤 데이터를 어디서 모았는지, 그 데이터의 특성(규모·속성·자료형)은 어떤지 적어 보세요.',
@@ -33,6 +35,14 @@ export function 프로젝트카드(단원, 분석, 다섯째물음) {
     '결과를 해석한 내용과, 친구에게 나누려고 어떻게 시각적으로 표현할지 적어 보세요.',
   ];
   return 카드(`${분석}으로 나만의 프로젝트 쓰기`, '프로젝트', (몸) => {
+    // 활동 HTML 로 저장할 때(캡처 모드)는 탭 대신 여섯 단계를 차례로 모두 펼친다 — 쓴 글이 다 담기게
+    if (캡처.켬) {
+      채우기(몸, h('p', {}, md(`이번 프로젝트에서 배운 **${분석}** 으로 내 주제를 정해 6단계를 채워 보세요.`)),
+        여섯단계.map((이름, i) => h('div', { class: 'two wide-left proj-all' },
+          쓰기(`${단원}.proj${i}`, { 안내: `**${i + 1}단계 · ${이름}** — ${물음[i]}`, 줄수: 4 }),
+          h('div', { class: 'box' }, h('h3', {}, '✅ 체크 사항'), 체크(`${단원}.projchk${i}`, 체크들[i])))));
+      return;
+    }
     let 지금 = 0;
     const 탭 = h('div', { class: 'seg proj-tabs' });
     const 내용 = h('div', { class: 'proj-step' });
@@ -47,7 +57,7 @@ export function 프로젝트카드(단원, 분석, 다섯째물음) {
     채우기(몸,
       h('p', {}, md(`이번 프로젝트에서 배운 **${분석}** 으로 내 주제를 정해 6단계를 채워 보세요. 쓴 내용은 이 브라우저에 저장돼요.`)),
       탭, 내용,
-      h('div', { class: 'row end' }, h('button', { type: 'button', class: 'btn', onclick: () => 내려받기(단원, 분석, 물음) }, '💾 활동지 내려받기 (HTML)')));
+      내려받기단추 ? h('div', { class: 'row end' }, h('button', { type: 'button', class: 'btn', onclick: () => 내려받기(단원, 분석, 물음) }, '💾 활동지 내려받기 (HTML)')) : null);
   });
 }
 

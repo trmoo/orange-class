@@ -103,6 +103,20 @@ export function 타이머(f, 간격) {
   return id;
 }
 export function 정리등록(f) { 정리할것.push(f); }
+/**
+ * 화면 밖에 잠깐 그리는 카드(활동 HTML 저장)가 거는 창 이벤트·타이머를 지금 화면 것과 따로 모은다.
+ * 돌려준 함수를 부르면 그것만 걷어 낸다 — 안 그러면 다른 카드의 붙여 넣기·키 이벤트가 지금 화면에 남는다.
+ */
+export function 따로그리기(f) {
+  const 옛 = 정리할것;
+  정리할것 = [];
+  const 걷기 = (모음) => () => { for (const g of 모음) g(); };
+  let 모음;
+  try { f(); }
+  catch (e) { 모음 = 정리할것; 정리할것 = 옛; 걷기(모음)(); throw e; }
+  모음 = 정리할것; 정리할것 = 옛;
+  return 걷기(모음);
+}
 
 /** 화면 아래 저작권 푸터 */
 export function 푸터() {

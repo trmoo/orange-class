@@ -63,8 +63,13 @@ export function 봄(단원, 번호) {
   if (!목록.includes(번호)) { 목록.push(번호); 저장(); }
 }
 
+// 화면 밖에서 카드를 그리는 동안(활동 HTML·PDF 저장 — capture.js 의 캡처 모드)에는 「끝냄」 을 적지 않는다.
+// 8번 k-Means 처럼 「보기만 해도 끝」 인 카드가 있어, 저장 단추를 누르기만 해도 안 한 활동이 끝난 것으로 적혔다(2026-11-17 발견).
+export const 기록잠금 = { 켬: false };
+
 /** 활동을 끝냈다고 적는다 (열쇠: 'u1.sort-data' 처럼) */
 export function 끝냄(열) {
+  if (기록잠금.켬) return;
   if (!상태.done[열]) { 상태.done[열] = true; 저장(); }
 }
 export const 끝났나 = (열) => !!상태.done[열];

@@ -24,6 +24,9 @@ import { PDF활동 as PDF활동5 } from '../src/units/u5.js';
 import { PDF활동 as PDF활동6 } from '../src/units/u6.js';
 import { PDF활동 as PDF활동7 } from '../src/units/u7.js';
 import { PDF파일이름, 마무리제목 } from '../src/units/finish.js';
+import { HTML파일이름, 학번맞나, 머리글, 파일만들기 } from '../src/units/unit-html.js';
+import { 끝냄, 끝났나, 상태 as 기록 } from '../src/lib/store.js';
+import { 캡처 } from '../src/lib/capture.js';
 import { 위젯목록 } from '../src/lib/orange.js';
 import { 다중평가, 다중교차검증 } from '../src/units/u5.js';
 
@@ -475,6 +478,51 @@ for (const [id, 활동, 마무리번호, 다음제목] of [['u4', PDF활동4, 20
 시험('Discretize 구간 이름이 오렌지 3.40 과 같다', () => {
   같다(JSON.stringify(구간이름([0, 1])), JSON.stringify(['< 0', '0 - 1', '≥ 1']));
   같다(구간찾기([0, 1], 5), '≥ 1'); 같다(구간찾기([0, 1], null), '?'); 같다(구간찾기([0.5], 0.2), '< 0.5');
+});
+
+// ── 지금까지 한 활동 HTML 로 저장 (2026-11-17) ─────────────────────
+시험('단원 머리줄에 「💾 지금까지 한 활동 HTML 로 저장」 단추가 있고 그 단원만 담는다', () => {
+  const 글 = readFileSync('src/main.js', 'utf-8');
+  참(글.includes("'💾 지금까지 한 활동 HTML 로 저장'"), '단추 글');
+  참(/class: 'save-btn'[^\n]*onclick: \(\) => 활동저장\(u\)/.test(글), '지금 단원(u)만 넘긴다');
+  // 단추는 단원 제목 바로 뒤, 카드 점 앞
+  const 제목 = 글.indexOf("class: 'unit-title'"), 단추 = 글.indexOf("class: 'save-btn'"), 점 = 글.indexOf('점들),', 제목);
+  참(제목 > 0 && 제목 < 단추 && 단추 < 점, '제목 → 단추 → 카드 점 차례');
+});
+시험('HTML 파일 이름 「학번 이름_단원 제목.html」 · 학번은 숫자 4~6자리', () => {
+  같다(HTML파일이름(' 20315 ', '홍길동', '날씨와 옷차림'), '20315 홍길동_날씨와 옷차림.html');
+  같다(HTML파일이름('20315', '홍:길동', '날씨와 옷차림'), '20315 홍_길동_날씨와 옷차림.html', '못 쓰는 글자');
+  for (const t of ['20315', '2031', '203150', ' 20315 ']) 참(학번맞나(t), t);
+  for (const t of ['', '203', '2031501', '2O315', '홍길동']) 참(!학번맞나(t), `안 됨: ${t}`);
+});
+시험('4~7단원은 활동 목록(PDF 와 같은 것)을 단원에 달고 있다 — HTML 의 활동 현황', () => {
+  const 목록 = { u4: PDF활동4, u5: PDF활동5, u6: PDF활동6, u7: PDF활동7 };
+  for (const u of 단원들) 같다(u.활동, 목록[u.id], u.id);
+});
+시험('HTML 머리글: 학번·이름·카드 본 표시·활동 현황, 학생 글은 태그가 되지 않는다', () => {
+  const u = 단원들.find((x) => x.id === 'u6');
+  const 활동 = u.활동.map((a, i) => ({ 카드: a.카드, 이름: a.이름, 됨: i < 2 }));
+  const 머리 = 머리글({ 단원: u, 학번: '20315', 이름: '<b>홍</b>', 때: new Date(2026, 10, 17, 9, 5), 본: [0, 2], 끝낸수: 2, 활동 });
+  참(머리.includes('20315') && 머리.includes('&lt;b&gt;홍&lt;/b&gt;') && !머리.includes('<b>홍'), '이름 이스케이프');
+  참(머리.includes('2026-11-17 09:05'), '저장한 때');
+  참(머리.includes(`활동 현황 — 2 / ${활동.length}`), '활동 현황 수');
+  같다((머리.match(/<a href="#card-\d+">/g) || []).length, u.카드.length, '카드마다 바로 가기');
+  같다((머리.match(/✔ \d+\. /g) || []).length, 2, '본 카드 수');
+  const 파일 = 파일만들기({ 단원: u, 학번: '20315', 이름: '홍길동', 때: new Date(), 머리, 조각들: [{ 번호: 1, html: '<article class="card"></article>' }], 모양: '.x{}' });
+  참(/^<!doctype html>/.test(파일) && 파일.includes('<meta charset="utf-8">'), '문서 머리');
+  참(파일.includes('© 2026 티쳐무') && 파일.includes('id="card-1"'), '저작권 · 카드 자리');
+  참(!/<script/i.test(파일), '파일에 스크립트가 없다');
+  const 첫단원 = 머리글({ 단원: 단원들[0], 학번: '20315', 이름: '홍길동', 때: new Date(), 본: [], 끝낸수: 3 });
+  참(첫단원.includes('끝낸 활동 — 3개'), '활동 목록이 없는 단원은 끝낸 수');
+});
+시험('캡처 모드(활동 저장·PDF)에서는 「끝냄」 이 적히지 않는다 — 그리기만으로 기록이 바뀌면 안 된다', () => {
+  const 열 = 'u0.시험용';
+  캡처.켬 = true;
+  try { 끝냄(열); 참(!끝났나(열), '캡처 중 끝냄'); } finally { 캡처.켬 = false; }
+  끝냄(열); 참(끝났나(열), '평소 끝냄');
+  delete 기록.done[열];
+  // k-Means 카드는 그리기만 해도 마침을 부른다 — 이 잠금이 없으면 저장 단추가 안 한 활동을 끝낸 것으로 만든다
+  참(/if \(정규화\) 마침\('u6\.kmeans'\)/.test(readFileSync('src/units/u6.js', 'utf-8')), 'k-Means 카드의 마침 자리(바뀌었으면 이 시험도 고칠 것)');
 });
 
 console.log(`\n  시험 ${통과 + 실패.length}가지 중 ${통과}가지 통과`);

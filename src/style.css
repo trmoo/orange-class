@@ -63,6 +63,8 @@ b { font-weight: 800; }
 .home-btn { font-size: 1.6rem; text-decoration: none; }
 .unit-title { display: flex; align-items: center; gap: 10px; font-weight: 900; font-size: 1.1rem; white-space: nowrap; }
 .unit-title .tile-no { min-width: 32px; height: 32px; font-size: 1rem; }
+.save-btn { flex: none; border: 1.5px solid var(--unit); background: #fff; color: var(--unit); font-weight: 800; font-size: .76rem; padding: 4px 12px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
+.save-btn:hover { background: var(--unit); color: #fff; }
 .card-dots { display: flex; gap: 5px; flex-wrap: wrap; margin-left: auto; justify-content: flex-end; }
 .cdot { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--line); text-decoration: none; color: var(--muted); font-size: .78rem; font-weight: 800; background: #fff; }
 .cdot.seen { background: var(--brand-soft); border-color: #f5c08a; color: var(--brand-deep); }

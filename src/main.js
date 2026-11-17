@@ -8,6 +8,7 @@ import { h, 채우기, 화면시작, 창이벤트, 푸터, 창, 묻기 } from '.
 import { 상태, 봄, 모두지우기 } from './lib/store.js';
 import { 열렸나, 코드확인, 어느단원코드 } from './lib/lock.js';
 import { 단원들 } from './units/index.js';
+import { 활동저장 } from './units/unit-html.js';
 
 const 앱 = document.getElementById('app');
 
@@ -132,6 +133,9 @@ function 카드화면(u, n) {
     h('header', { class: 'unit-head', style: { '--unit': u.색 } },
       h('a', { href: '#', class: 'home-btn', title: '첫 화면' }, '🍊'),
       h('div', { class: 'unit-title' }, h('span', { class: 'tile-no' }, u.번호), h('span', {}, u.제목)),
+      // 이 단원 카드만 HTML 한 파일로 — 학번·이름은 그 파일에만 들어간다(2026-11-17 사용자 지시)
+      h('button', { type: 'button', class: 'save-btn', title: `${u.번호}단원 카드 ${u.카드.length}장을 「학번 이름_${u.제목}.html」 로 저장합니다`, onclick: () => 활동저장(u) },
+        '💾 지금까지 한 활동 HTML 로 저장'),
       점들),
     h('main', { class: 'stage' },
       h('article', { class: `card k-${카드.종류 || '개념'}` },
